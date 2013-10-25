@@ -160,6 +160,8 @@ Aucune disposition de la présente Déclaration ne peut être interprétée comm
 
 -- Texts from : http://www.lexilogos.com/declaration/index.htm
 
+require "../../dquick/dml/scrollView"
+
 GraphicItem
 {	
     id = "main",
@@ -171,16 +173,6 @@ GraphicItem
 		width = 300,
 		height = 50,
 
-		-- Text {
-			-- font = "AngsanaUPC",
-			-- text = function()
-				-- if (kerningButton.pressed) then
-					-- return "Ayuma2yk"
-				-- end
-				-- return "AngsanaUPC"
-			-- end,
-		-- },
-		
 		MouseArea {
 			id = "kerningButton",
 			width = function()
@@ -192,7 +184,8 @@ GraphicItem
 		},
 	},
 
-	Text {
+	ScrollView {
+		id = "textView",
 		width = function()
 			return main.width
 		end,
@@ -200,35 +193,44 @@ GraphicItem
 			return main.height
 		end,
 
-		id = "text",
-		y = 50,
-		text = textFr,
-		-- font = "AngsanaUPC",
-		font = function()
-			if (kerningButton.pressed) then
-				return "AngsanaUPC"
-			end
-			return "Arial"
-		end,
-		fontSize = 24,
-		-- fontSize = function()
-			-- if (kerningButton.pressed) then
-				-- return 16
-			-- end
-			-- return 24
-		-- end,
-		fontFamily = function()
-			if (kerningButton.pressed) then
-				return Text.FontFamily.Italic
-			end
-			return Text.FontFamily.Regular
-		end,
-		-- kerning = function()
-			-- return kerningButton.pressed
-		-- end,
-		
-		width = function()
-			return main.width
-		end,
+		Text {
+			width = function()
+				return implicitWidth
+			end,
+			height = function()
+				return implicitHeight
+			end,
+
+			id = "text",
+			y = 50,
+			text = textFr,
+			-- font = "AngsanaUPC",
+			font = function()
+				if (kerningButton.pressed) then
+					return "AngsanaUPC"
+				end
+				return "Arial"
+			end,
+			fontSize = 24,
+			-- fontSize = function()
+				-- if (kerningButton.pressed) then
+					-- return 16
+				-- end
+				-- return 24
+			-- end,
+			fontFamily = function()
+				if (kerningButton.pressed) then
+					return Text.FontFamily.Italic
+				end
+				return Text.FontFamily.Regular
+			end,
+			-- kerning = function()
+				-- return kerningButton.pressed
+			-- end,
+			
+			width = function()
+				return main.width
+			end,
+		},
 	},
 }

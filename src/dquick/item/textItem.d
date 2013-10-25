@@ -96,6 +96,12 @@ public:
 	@property WrapMode	wrapMode() {return mWrapMode;}
 	mixin Signal!(WrapMode) onWrapModeChanged;
 
+	@property float	implicitWidth() {return mImplicitSize.x;}
+	mixin Signal!(float) onImplicitWidth;
+
+	@property float	implicitHeight() {return mImplicitSize.y;}
+	mixin Signal!(float) onImplicitHeight;
+
 	@property void	kerning(bool flag)
 	{
 		mKerning = flag;
@@ -359,6 +365,9 @@ private:
 			// --
 
 			mMesh.setTexture(mTextures[0]);
+
+			onImplicitWidth.emit(mImplicitSize.x);
+			onImplicitHeight.emit(mImplicitSize.y);
 		}
 		catch (Exception e)
 		{

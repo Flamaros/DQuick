@@ -27,6 +27,10 @@ public:
 			mChildren ~= item;
 			item.parent = this;
 		}
+
+		// TODO Return an array when DML will support arrays
+		int	childrenCount() {return mChildren.length;}
+		DeclarativeItem	child(int index) {return mChildren[index];}
 	}
 
 	void	paint(bool transformationUpdated)
