@@ -80,6 +80,8 @@
     <Folder Include="..\src\dquick\system\linux\" />
     <Folder Include="dquick\" />
     <Folder Include="dquick\system\fontconfig\" />
+    <Folder Include="dquick\etc\X11\" />
+    <Folder Include="dquick\system\xcb\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\src\dquick\algorithms\atlas.d">
@@ -546,6 +548,75 @@
     </Compile>
     <Compile Include="..\src\dquick\system\fontconfig\types.d">
       <Link>dquick\system\fontconfig\types.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\X.d">
+      <Link>dquick\etc\X11\X.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xlib.d">
+      <Link>dquick\etc\X11\Xlib.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\XlibConf.d">
+      <Link>dquick\etc\X11\XlibConf.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xlibint.d">
+      <Link>dquick\etc\X11\Xlibint.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xmd.d">
+      <Link>dquick\etc\X11\Xmd.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xproto.d">
+      <Link>dquick\etc\X11\Xproto.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xprotostr.d">
+      <Link>dquick\etc\X11\Xprotostr.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xregion.d">
+      <Link>dquick\etc\X11\Xregion.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xresource.d">
+      <Link>dquick\etc\X11\Xresource.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xtos.d">
+      <Link>dquick\etc\X11\Xtos.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xutil.d">
+      <Link>dquick\etc\X11\Xutil.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\keysym.d">
+      <Link>dquick\etc\X11\keysym.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\keysymdef.d">
+      <Link>dquick\etc\X11\keysymdef.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\XI.d">
+      <Link>dquick\etc\X11\extensions\XI.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\XI2.d">
+      <Link>dquick\etc\X11\extensions\XI2.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\XInput2.d">
+      <Link>dquick\etc\X11\extensions\XInput2.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\Xge.d">
+      <Link>dquick\etc\X11\extensions\Xge.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\Xrandr.d">
+      <Link>dquick\etc\X11\extensions\Xrandr.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\Xrender.d">
+      <Link>dquick\etc\X11\extensions\Xrender.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\randr.d">
+      <Link>dquick\etc\X11\extensions\randr.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\etc\libX11\deimos\X11\extensions\render.d">
+      <Link>dquick\etc\X11\extensions\render.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\system\xcb\guiApplicationXCB.d">
+      <Link>dquick\system\xcb\guiApplicationXCB.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\system\xcb\openglContextXCB.d">
+      <Link>dquick\system\xcb\openglContextXCB.d</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

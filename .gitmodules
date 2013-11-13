@@ -4,3 +4,9 @@
 [submodule "src/dquick/etc/gl3n"]
 	path = src/dquick/etc/gl3n
 	url = https://github.com/D-Quick/gl3n.git
+[submodule "src/dquick/etc/libX11"]
+	path = src/dquick/etc/libX11
+	url = https://github.com/D-Quick/libX11.git
+[submodule "src/dquick/etc/XCB"]
+	path = src/dquick/etc/XCB
+	url = https://github.com/D-Quick/XCB.git
