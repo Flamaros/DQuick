@@ -461,6 +461,49 @@
      <File path="..\src\dquick\etc\gl3n\gl3n\plane.d" />
      <File path="..\src\dquick\etc\gl3n\gl3n\util.d" />
     </Folder>
+    <Folder name="libX11">
+     <Folder name="deimos">
+      <Folder name="X11">
+       <Folder name="extensions">
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\randr.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\render.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\Xge.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\XI.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\XI2.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\XInput2.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\Xrandr.d" />
+        <File path="..\src\dquick\etc\libX11\deimos\X11\extensions\Xrender.d" />
+       </Folder>
+       <File path="..\src\dquick\etc\libX11\deimos\X11\keysym.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\keysymdef.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\X.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xlib.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\XlibConf.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xlibint.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xlib_xcb.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xmd.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xproto.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xprotostr.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xregion.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xresource.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xtos.d" />
+       <File path="..\src\dquick\etc\libX11\deimos\X11\Xutil.d" />
+      </Folder>
+     </Folder>
+    </Folder>
+    <Folder name="XCB">
+     <Folder name="deimos">
+      <Folder name="XCB">
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\bigreq.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\dri2.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\glx.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\xcb.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\xcbext.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\xc_misc.d" />
+       <File path="..\src\dquick\etc\XCB\deimos\XCB\xproto.d" />
+      </Folder>
+     </Folder>
+    </Folder>
    </Folder>
    <Folder name="events">
     <File path="..\src\dquick\events\mouseEvent.d" />
