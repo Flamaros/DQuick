@@ -245,21 +245,21 @@ enum FcSetName {
 	FcSetApplication = 1
 }
 
-alias void	FcAtomic;
+struct	FcAtomic;
 
 enum FcEndian {
 	FcEndianBig,
 	FcEndianLittle
 }
 
-alias void	FcConfig;
+struct	FcConfig;
 
-alias void	FcFileCache;
+struct	FcFileCache;
 
-alias void	FcBlanks;
+struct	FcBlanks;
 
-alias void	FcStrList;
+struct	FcStrList;
 
-alias void	FcStrSet;
+struct	FcStrSet;
 
-alias void	FcCache;
+struct	FcCache;
