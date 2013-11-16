@@ -12,6 +12,9 @@ version(Posix)
 {
 	// TODO remove that, it's normally linked with DQuick
 	pragma(lib, "dl");	// dl functions aren't linked by default with dmd
+	pragma(lib, "X11");
+	pragma(lib, "X11-xcb");
+	pragma(lib, "xcb");
 }
 
 int main(string[] args)

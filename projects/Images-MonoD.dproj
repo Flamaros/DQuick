@@ -21,6 +21,8 @@
         <Path>../src</Path>
         <Path>../src/dquick/etc/derelict/import</Path>
         <Path>../src/dquick/etc/gl3n</Path>
+        <Path>../src/dquick/etc/libX11</Path>
+        <Path>../src/dquick/etc/XCB</Path>
       </Includes>
     </Includes>
   </PropertyGroup>
@@ -42,6 +44,13 @@
     <Externalconsole>True</Externalconsole>
     <Target>Executable</Target>
     <OutputName>../../../data/dquick-sample</OutputName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release Unittest|AnyCPU' ">
+    <OutputPath>.</OutputPath>
+    <Target>Executable</Target>
+    <OutputName />
+    <UnittestMode>false</UnittestMode>
+    <DebugLevel>0</DebugLevel>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="..\src\images\" />

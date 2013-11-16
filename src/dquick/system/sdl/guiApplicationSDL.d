@@ -72,6 +72,7 @@ public:
 	{
 		assert(mInitialized == false);
 
+		// TODO replace by thisExePath
 		mApplicationDirectory = dirName(args[0]) ~ dirSeparator;
 
 		mInitialized = true;

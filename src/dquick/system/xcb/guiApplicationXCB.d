@@ -15,9 +15,16 @@ version (linux)
 	import dquick.script.dmlEngine;
 
 	import std.path;
-//	pragma(lib, "gdi32.lib");
+
+	pragma(lib, "X11");
+	pragma(lib, "X11-xcb");
+	pragma(lib, "xcb");
 
 	import dquick.system.xcb.openglContextXCB;
+	import deimos.X11.Xlib;
+	import deimos.X11.Xlib_xcb;
+	import deimos.XCB.xcb;
+	import deimos.XCB.xproto;
 
 	class GuiApplication : IGuiApplication
 	{
@@ -45,7 +52,7 @@ version (linux)
 
 		int	execute()
 		{
-			while (!mQuit)
+//			while (!mQuit)
 			{
 /*				while (PeekMessageA(&msg, null, 0, 0, PM_REMOVE))
 				{
@@ -111,6 +118,47 @@ version (linux)
 
 		bool	create()
 		{
+			Display*	display;
+			int			default_screen;
+			
+			/* Open Xlib Display */ 
+			display = XOpenDisplay(null);
+			if (!display)
+			{
+				throw new Exception("Can't open display");
+				return false;
+			}
+			
+			default_screen = DefaultScreen(display);
+			
+			/* Get the XCB connection from the display */
+			xcb_connection_t *connection = 
+				XGetXCBConnection(display);
+			if (!connection)
+			{
+				XCloseDisplay(display);
+				throw new Exception("Can't get xcb connection from display");
+				return false;
+			}
+			
+			/* Acquire event queue ownership */
+			XSetEventQueueOwner(display, XEventQueueOwner.XCBOwnsEventQueue);
+			
+			/* Find XCB screen */
+			xcb_screen_t*			screen = null;
+			xcb_screen_iterator_t	screen_iter =xcb_setup_roots_iterator(xcb_get_setup(connection));
+			for (int screen_num = default_screen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter))
+			{
+			}
+			screen = screen_iter.data;
+			
+			/* Initialize window and OpenGL context, run main loop and deinitialize */  
+//			int retval = setup_and_run(display, connection, default_screen, screen);
+			
+			/* Cleanup */
+			XCloseDisplay(display);
+
+
 			return true;
 		}
 
