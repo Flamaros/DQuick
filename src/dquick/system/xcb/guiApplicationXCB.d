@@ -1,5 +1,7 @@
 module dquick.system.xcb.guiApplicationXCB;
 
+import derelict.lua.lua;
+
 version (linux)
 {
 	import dquick.system.guiApplication;
@@ -15,6 +17,8 @@ version (linux)
 	import dquick.script.dmlEngine;
 
 	import std.path;
+	import std.stdio;
+	import std.stdint;
 
 	pragma(lib, "X11");
 	pragma(lib, "X11-xcb");
@@ -26,9 +30,51 @@ version (linux)
 	import deimos.XCB.xcb;
 	import deimos.XCB.xproto;
 
+	// TODO remove : normally in openglContextXXB.d
+	import derelict.opengl3.glx;
+
 	class GuiApplication : IGuiApplication
 	{
 	public:
+		static this()
+		{
+			DerelictGL.load();
+			DerelictLua.load();
+
+			/* Open Xlib Display */ 
+			display = XOpenDisplay(null);
+			if (!display)
+				throw new Exception("Can't open display");
+
+			default_screen = DefaultScreen(display);
+			
+			/* Get the XCB connection from the display */
+			connection = XGetXCBConnection(display);
+			scope(failure) XCloseDisplay(display);
+			if (!connection)
+				throw new Exception("Can't get xcb connection from display");
+
+			/* Acquire event queue ownership */
+			XSetEventQueueOwner(display, XEventQueueOwner.XCBOwnsEventQueue);
+			
+			/* Find XCB screen */
+			screen = null;
+			xcb_screen_iterator_t	screen_iter =xcb_setup_roots_iterator(xcb_get_setup(connection));
+			for (int screen_num = default_screen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter))
+			{
+			}
+			screen = screen_iter.data;
+		}
+		
+		static ~this()
+		{
+			/* Cleanup */
+			XCloseDisplay(display);
+
+			DerelictLua.unload();
+			DerelictGL.unload();
+		}
+		
 		static GuiApplication	instance()
 		{
 			if (mInstance is null)
@@ -52,17 +98,35 @@ version (linux)
 
 		int	execute()
 		{
-//			while (!mQuit)
+			while (!mQuit)
 			{
-/*				while (PeekMessageA(&msg, null, 0, 0, PM_REMOVE))
+				/* Wait for event */
+				xcb_generic_event_t *event = xcb_wait_for_event(connection);
+				if (!event)
 				{
-					TranslateMessage(&msg);
-					DispatchMessageA(&msg);
-				}*/
-
-/*				if (!mQuit)
-					foreach (Window window; mWindows)
-						window.onPaint();*/
+					writefln("i/o error in xcb_wait_for_event");
+					return -1;
+				}
+				
+				switch (event.response_type & ~0x80)
+				{
+					case XCB_KEY_PRESS:
+						/* Quit on key press */
+						mQuit = true;
+						break;
+					case XCB_EXPOSE:
+						/* Handle expose event, draw and swap buffers */
+						if (!mQuit)
+							foreach (Window window; mWindows)
+							{
+								window.onPaint();
+//								glXSwapBuffers(display, drawable);
+							}
+						break;
+					default:
+						break;
+				}
+				free(event);
 			}
 			return 0;
 		}
@@ -83,13 +147,19 @@ version (linux)
 			mWindows[windowHandle] = window;
 		}*/
 
-		static GuiApplication	mInstance;
-		static bool				mQuit = false;
+		static GuiApplication		mInstance;
+		static bool					mQuit = false;
 
-		static string		mApplicationDisplayName = "DQuick - Application";
-		static string		mApplicationDirectory = ".";
-		static bool			mInitialized = false;
-//		static Window[HWND]	mWindows;
+		static string				mApplicationDisplayName = "DQuick - Application";
+		static string				mApplicationDirectory = ".";
+		static bool					mInitialized = false;
+
+		static xcb_connection_t*	connection;
+		static Display*				display;
+		static int					default_screen;
+		static xcb_screen_t*		screen;
+
+		static Window[xcb_window_t]	mWindows;
 	}
 
 	//==========================================================================
@@ -118,47 +188,82 @@ version (linux)
 
 		bool	create()
 		{
-			Display*	display;
-			int			default_screen;
+			/* Initialize window and OpenGL context, run main loop and deinitialize */
+			int visualID = 0;
 			
-			/* Open Xlib Display */ 
-			display = XOpenDisplay(null);
-			if (!display)
+			/* Query framebuffer configurations */
+			GLXFBConfig*	fb_configs = null;
+			int				num_fb_configs = 0;
+			
+			fb_configs = glXGetFBConfigs(GuiApplication.display, GuiApplication.default_screen, &num_fb_configs);
+			if (!fb_configs || num_fb_configs == 0)
 			{
-				throw new Exception("Can't open display");
+				writefln("glXGetFBConfigs failed");
 				return false;
 			}
 			
-			default_screen = DefaultScreen(display);
+			/* Select first framebuffer config and query visualID */
+			GLXFBConfig	fb_config = fb_configs[0];
+			glXGetFBConfigAttrib(GuiApplication.display, fb_config, GLX_VISUAL_ID , &visualID);
 			
-			/* Get the XCB connection from the display */
-			xcb_connection_t *connection = 
-				XGetXCBConnection(display);
-			if (!connection)
+			/* Create OpenGL context */
+			context = glXCreateNewContext(GuiApplication.display, fb_config, GLX_RGBA_TYPE, 0, True);
+			if(!context)
 			{
-				XCloseDisplay(display);
-				throw new Exception("Can't get xcb connection from display");
+				writefln("glXCreateNewContext failed");
 				return false;
 			}
 			
-			/* Acquire event queue ownership */
-			XSetEventQueueOwner(display, XEventQueueOwner.XCBOwnsEventQueue);
+			/* Create XID's for colormap and window */
+			xcb_colormap_t	colormap = xcb_generate_id(GuiApplication.connection);
+
+			window = xcb_generate_id(GuiApplication.connection);
 			
-			/* Find XCB screen */
-			xcb_screen_t*			screen = null;
-			xcb_screen_iterator_t	screen_iter =xcb_setup_roots_iterator(xcb_get_setup(connection));
-			for (int screen_num = default_screen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter))
+			/* Create colormap */
+			xcb_create_colormap(GuiApplication.connection, xcb_colormap_alloc_t.XCB_COLORMAP_ALLOC_NONE, colormap, GuiApplication.screen.root, visualID);
+			
+			/* Create window */
+			uint32_t	eventmask = xcb_event_mask_t.XCB_EVENT_MASK_EXPOSURE | xcb_event_mask_t.XCB_EVENT_MASK_KEY_PRESS;
+			uint32_t	valuelist[] = [eventmask, colormap, 0];
+			uint32_t	valuemask = xcb_cw_t.XCB_CW_EVENT_MASK | xcb_cw_t.XCB_CW_COLORMAP;
+			
+			xcb_create_window(GuiApplication.connection, XCB_COPY_FROM_PARENT, window, GuiApplication.screen.root,
+			                  0, 0,
+			                  150, 150,
+			                  0, cast(ushort)xcb_window_class_t.XCB_WINDOW_CLASS_INPUT_OUTPUT, visualID, valuemask, valuelist.ptr);
+
+			// NOTE: window must be mapped before glXMakeContextCurrent
+			xcb_map_window(GuiApplication.connection, window); 
+			
+			/* Create GLX Window */
+			GLXDrawable	drawable = 0;
+			
+			glxwindow = glXCreateWindow(GuiApplication.display, fb_config, window, null);
+			
+			if (!window)
 			{
+				xcb_destroy_window(GuiApplication.connection, window);
+				glXDestroyContext(GuiApplication.display, context);
+				
+				writefln("glXDestroyContext failed");
+				return false;
 			}
-			screen = screen_iter.data;
 			
-			/* Initialize window and OpenGL context, run main loop and deinitialize */  
-//			int retval = setup_and_run(display, connection, default_screen, screen);
+			drawable = glxwindow;
 			
-			/* Cleanup */
-			XCloseDisplay(display);
-
-
+			/* make OpenGL context current */
+			if (!glXMakeContextCurrent(GuiApplication.display, drawable, drawable, context))
+			{
+				xcb_destroy_window(GuiApplication.connection, window);
+				glXDestroyContext(GuiApplication.display, context);
+				
+				writefln("glXMakeContextCurrent failed");
+				return false;
+			}
+			
+			/* run main loop */
+//			int	retval = main_loop(display, connection, window, drawable);
+			
 			return true;
 		}
 
@@ -171,6 +276,12 @@ version (linux)
 			.destroy(mScriptContext);
 			.destroy(mContext);
 			mContext = null;
+
+			/* Cleanup */
+			glXDestroyWindow(GuiApplication.display, glxwindow);
+			xcb_destroy_window(GuiApplication.connection, window);
+			glXDestroyContext(GuiApplication.display, context);
+
 /*			DestroyWindow(mhWnd);
 			if (mWindowId == 0)
 				GuiApplication.instance.quit();*/
@@ -276,13 +387,17 @@ version (linux)
 		static int	mWindowsCounter = 0;
 		int			mWindowId;
 
-//		HWND		mhWnd = null;
-		string		mWindowName = "";
-		GraphicItem	mRootItem;
-		Vector2s32	mPosition;
-		Vector2s32	mSize = Vector2s32(640, 480);
-		bool		mFullScreen = false;
+		xcb_window_t		window;
+		GLXWindow 			glxwindow;
+		string				mWindowName = "";
+		GraphicItem			mRootItem;
+		Vector2s32			mPosition;
+		Vector2s32			mSize = Vector2s32(640, 480);
+		bool				mFullScreen = false;
 
-		OpenGLContext	mContext;
+		OpenGLContext		mContext;
+
+		// TODO move to OpenGLContext module
+		GLXContext	context;
 	}
 }
