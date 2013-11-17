@@ -207,7 +207,7 @@ version (linux)
 			glXGetFBConfigAttrib(GuiApplication.display, fb_config, GLX_VISUAL_ID , &visualID);
 			
 			/* Create OpenGL context */
-			context = glXCreateNewContext(GuiApplication.display, fb_config, GLX_RGBA_TYPE, 0, True);
+			context = glXCreateNewContext(GuiApplication.display, fb_config, GLX_RGBA_TYPE, null, True);
 			if(!context)
 			{
 				writefln("glXCreateNewContext failed");
