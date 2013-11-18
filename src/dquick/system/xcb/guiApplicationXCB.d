@@ -42,34 +42,34 @@ version (linux)
 			DerelictLua.load();
 
 			/* Open Xlib Display */ 
-			display = XOpenDisplay(null);
-			if (!display)
+			mDisplay = XOpenDisplay(null);
+			if (!mDisplay)
 				throw new Exception("Can't open display");
 
-			default_screen = DefaultScreen(display);
+			mDefaultScreen = DefaultScreen(mDisplay);
 			
 			/* Get the XCB connection from the display */
-			connection = XGetXCBConnection(display);
-			scope(failure) XCloseDisplay(display);
-			if (!connection)
+			mConnection = XGetXCBConnection(mDisplay);
+			scope(failure) XCloseDisplay(mDisplay);
+			if (!mConnection)
 				throw new Exception("Can't get xcb connection from display");
 
 			/* Acquire event queue ownership */
-			XSetEventQueueOwner(display, XEventQueueOwner.XCBOwnsEventQueue);
+			XSetEventQueueOwner(mDisplay, XEventQueueOwner.XCBOwnsEventQueue);
 			
 			/* Find XCB screen */
-			screen = null;
-			xcb_screen_iterator_t	screen_iter =xcb_setup_roots_iterator(xcb_get_setup(connection));
-			for (int screen_num = default_screen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter))
+			mScreen = null;
+			xcb_screen_iterator_t	screen_iter =xcb_setup_roots_iterator(xcb_get_setup(mConnection));
+			for (int screen_num = mDefaultScreen; screen_iter.rem && screen_num > 0; --screen_num, xcb_screen_next(&screen_iter))
 			{
 			}
-			screen = screen_iter.data;
+			mScreen = screen_iter.data;
 		}
 		
 		static ~this()
 		{
 			/* Cleanup */
-			XCloseDisplay(display);
+			XCloseDisplay(mDisplay);
 
 			DerelictLua.unload();
 			DerelictGL.unload();
@@ -101,7 +101,7 @@ version (linux)
 			while (!mQuit)
 			{
 				/* Wait for event */
-				xcb_generic_event_t *event = xcb_wait_for_event(connection);
+				xcb_generic_event_t *event = xcb_wait_for_event(mConnection);
 				if (!event)
 				{
 					writefln("i/o error in xcb_wait_for_event");
@@ -154,10 +154,10 @@ version (linux)
 		static string				mApplicationDirectory = ".";
 		static bool					mInitialized = false;
 
-		static xcb_connection_t*	connection;
-		static Display*				display;
-		static int					default_screen;
-		static xcb_screen_t*		screen;
+		static xcb_connection_t*	mConnection;
+		static Display*				mDisplay;
+		static int					mDefaultScreen;
+		static xcb_screen_t*		mScreen;
 
 		static Window[xcb_window_t]	mWindows;
 	}
@@ -195,7 +195,7 @@ version (linux)
 			GLXFBConfig*	fb_configs = null;
 			int				num_fb_configs = 0;
 			
-			fb_configs = glXGetFBConfigs(GuiApplication.display, GuiApplication.default_screen, &num_fb_configs);
+			fb_configs = glXGetFBConfigs(GuiApplication.mDisplay, GuiApplication.mDefaultScreen, &num_fb_configs);
 			if (!fb_configs || num_fb_configs == 0)
 			{
 				writefln("glXGetFBConfigs failed");
@@ -204,65 +204,65 @@ version (linux)
 			
 			/* Select first framebuffer config and query visualID */
 			GLXFBConfig	fb_config = fb_configs[0];
-			glXGetFBConfigAttrib(GuiApplication.display, fb_config, GLX_VISUAL_ID , &visualID);
+			glXGetFBConfigAttrib(GuiApplication.mDisplay, fb_config, GLX_VISUAL_ID , &visualID);
 			
 			/* Create OpenGL context */
-			context = glXCreateNewContext(GuiApplication.display, fb_config, GLX_RGBA_TYPE, null, True);
-			if(!context)
+			context = glXCreateNewContext(GuiApplication.mDisplay, fb_config, GLX_RGBA_TYPE, null, True);
+			if (!context)
 			{
 				writefln("glXCreateNewContext failed");
 				return false;
 			}
 			
 			/* Create XID's for colormap and window */
-			xcb_colormap_t	colormap = xcb_generate_id(GuiApplication.connection);
+			xcb_colormap_t	colormap = xcb_generate_id(GuiApplication.mConnection);
 
-			window = xcb_generate_id(GuiApplication.connection);
+			mWindow = xcb_generate_id(GuiApplication.mConnection);
 			
 			/* Create colormap */
-			xcb_create_colormap(GuiApplication.connection, xcb_colormap_alloc_t.XCB_COLORMAP_ALLOC_NONE, colormap, GuiApplication.screen.root, visualID);
+			xcb_create_colormap(GuiApplication.mConnection, xcb_colormap_alloc_t.XCB_COLORMAP_ALLOC_NONE, colormap, GuiApplication.mScreen.root, visualID);
 			
 			/* Create window */
 			uint32_t	eventmask = xcb_event_mask_t.XCB_EVENT_MASK_EXPOSURE | xcb_event_mask_t.XCB_EVENT_MASK_KEY_PRESS;
 			uint32_t	valuelist[] = [eventmask, colormap, 0];
 			uint32_t	valuemask = xcb_cw_t.XCB_CW_EVENT_MASK | xcb_cw_t.XCB_CW_COLORMAP;
 			
-			xcb_create_window(GuiApplication.connection, XCB_COPY_FROM_PARENT, window, GuiApplication.screen.root,
+			xcb_create_window(GuiApplication.mConnection, XCB_COPY_FROM_PARENT, mWindow, GuiApplication.mScreen.root,
 			                  0, 0,
 			                  150, 150,
 			                  0, cast(ushort)xcb_window_class_t.XCB_WINDOW_CLASS_INPUT_OUTPUT, visualID, valuemask, valuelist.ptr);
 
 			// NOTE: window must be mapped before glXMakeContextCurrent
-			xcb_map_window(GuiApplication.connection, window); 
+			xcb_map_window(GuiApplication.mConnection, mWindow); 
 			
 			/* Create GLX Window */
 			GLXDrawable	drawable = 0;
 			
-			glxwindow = glXCreateWindow(GuiApplication.display, fb_config, window, null);
+			mGLXWindow = glXCreateWindow(GuiApplication.mDisplay, fb_config, mWindow, null);
 			
-			if (!window)
+			if (!mWindow)
 			{
-				xcb_destroy_window(GuiApplication.connection, window);
-				glXDestroyContext(GuiApplication.display, context);
+				xcb_destroy_window(GuiApplication.mConnection, mWindow);
+				glXDestroyContext(GuiApplication.mDisplay, context);
 				
 				writefln("glXDestroyContext failed");
 				return false;
 			}
 			
-			drawable = glxwindow;
+			drawable = mGLXWindow;
 			
 			/* make OpenGL context current */
-			if (!glXMakeContextCurrent(GuiApplication.display, drawable, drawable, context))
+			if (!glXMakeContextCurrent(GuiApplication.mDisplay, drawable, drawable, context))
 			{
-				xcb_destroy_window(GuiApplication.connection, window);
-				glXDestroyContext(GuiApplication.display, context);
-				
+				xcb_destroy_window(GuiApplication.mConnection, mWindow);
+				glXDestroyContext(GuiApplication.mDisplay, context);
+
 				writefln("glXMakeContextCurrent failed");
 				return false;
 			}
-			
+
 			/* run main loop */
-//			int	retval = main_loop(display, connection, window, drawable);
+//			int	retval = main_loop(display, connection, mWindow, drawable);
 			
 			return true;
 		}
@@ -278,9 +278,9 @@ version (linux)
 			mContext = null;
 
 			/* Cleanup */
-			glXDestroyWindow(GuiApplication.display, glxwindow);
-			xcb_destroy_window(GuiApplication.connection, window);
-			glXDestroyContext(GuiApplication.display, context);
+			glXDestroyWindow(GuiApplication.mDisplay, mGLXWindow);
+			xcb_destroy_window(GuiApplication.mConnection, mWindow);
+			glXDestroyContext(GuiApplication.mDisplay, context);
 
 /*			DestroyWindow(mhWnd);
 			if (mWindowId == 0)
@@ -387,8 +387,8 @@ version (linux)
 		static int	mWindowsCounter = 0;
 		int			mWindowId;
 
-		xcb_window_t		window;
-		GLXWindow 			glxwindow;
+		xcb_window_t		mWindow;
+		GLXWindow 			mGLXWindow;
 		string				mWindowName = "";
 		GraphicItem			mRootItem;
 		Vector2s32			mPosition;
