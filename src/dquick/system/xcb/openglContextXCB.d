@@ -25,6 +25,7 @@ version (linux)
 		{
 		}
 
+		// TODO seems not depending of the platform, so put it in a more generic place
 		void	resize(int width, int height)
 		{
 			if (height == 0)										// Prevent A Divide By Zero By

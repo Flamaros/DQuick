@@ -28,7 +28,7 @@ int main(string[] args)
 		Window	mainWindow = new Window();
 		mainWindow.create();
 
-		ImageItem mainDML = new ImageItem();
+//		ImageItem mainDML = new ImageItem();
 
 		chdir(GuiApplication.instance().directoryPath);
 

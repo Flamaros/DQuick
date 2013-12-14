@@ -120,7 +120,7 @@ version (linux)
 							foreach (Window window; mWindows)
 							{
 								window.onPaint();
-//								glXSwapBuffers(display, drawable);
+								glXSwapBuffers(mDisplay, window.mDrawable);	// Put it in the context
 							}
 						break;
 					default:
@@ -202,10 +202,23 @@ version (linux)
 				return false;
 			}
 			
-			/* Select first framebuffer config and query visualID */
-			GLXFBConfig	fb_config = fb_configs[0];
-			glXGetFBConfigAttrib(GuiApplication.mDisplay, fb_config, GLX_VISUAL_ID , &visualID);
-			
+			/* Select first valid framebuffer config and query visualID */
+			GLXFBConfig fb_config;
+			int config = 0;
+			for (config = 0; config < num_fb_configs; config++)
+			{
+				fb_config = fb_configs[config];
+				visualID = 0;
+				glXGetFBConfigAttrib(GuiApplication.mDisplay, fb_config, GLX_VISUAL_ID, &visualID);
+				if (visualID != 0)
+					break;
+			}
+			if (visualID == 0)
+			{
+				writefln("Failed to find a supported configuration");
+				return false;
+			}
+
 			/* Create OpenGL context */
 			context = glXCreateNewContext(GuiApplication.mDisplay, fb_config, GLX_RGBA_TYPE, null, True);
 			if (!context)
@@ -236,8 +249,8 @@ version (linux)
 			xcb_map_window(GuiApplication.mConnection, mWindow); 
 			
 			/* Create GLX Window */
-			GLXDrawable	drawable = 0;
-			
+			mDrawable = 0;
+
 			mGLXWindow = glXCreateWindow(GuiApplication.mDisplay, fb_config, mWindow, null);
 			
 			if (!mWindow)
@@ -249,10 +262,10 @@ version (linux)
 				return false;
 			}
 			
-			drawable = mGLXWindow;
+			mDrawable = mGLXWindow;
 			
 			/* make OpenGL context current */
-			if (!glXMakeContextCurrent(GuiApplication.mDisplay, drawable, drawable, context))
+			if (!glXMakeContextCurrent(GuiApplication.mDisplay, mDrawable, mDrawable, context))
 			{
 				xcb_destroy_window(GuiApplication.mConnection, mWindow);
 				glXDestroyContext(GuiApplication.mDisplay, context);
@@ -261,8 +274,19 @@ version (linux)
 				return false;
 			}
 
+			DerelictGL.reload(GLVersion.GL21, false);
+
+			auto	glVersion = glGetString(GL_VERSION);
+			if (glVersion)
+				printf("[OpenGLContext] OpenGL Version: %s\n", glVersion);
+
+			mContext = new OpenGLContext();
+//			mContext.initialize(mhWnd);
+			Renderer.initialize();
+			mContext.resize(size().x, size().y);
+
 			/* run main loop */
-//			int	retval = main_loop(display, connection, mWindow, drawable);
+//			int	retval = main_loop(display, connection, mWindow, mDrawable);
 			
 			return true;
 		}
@@ -388,6 +412,7 @@ version (linux)
 		int			mWindowId;
 
 		xcb_window_t		mWindow;
+		GLXDrawable			mDrawable;
 		GLXWindow 			mGLXWindow;
 		string				mWindowName = "";
 		GraphicItem			mRootItem;
