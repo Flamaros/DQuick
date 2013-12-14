@@ -645,6 +645,18 @@
     <Compile Include="..\src\dquick\etc\libX11\deimos\X11\Xlib_xcb.d">
       <Link>dquick\etc\X11\Xlib_xcb.d</Link>
     </Compile>
+    <Compile Include="..\src\dquick\media\imageData.d">
+      <Link>dquick\media\imageData.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\script\dmlEngineCore.d">
+      <Link>dquick\script\dmlEngineCore.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\algorithms\scheduler.d">
+      <Link>dquick\algorithms\scheduler.d</Link>
+    </Compile>
+    <Compile Include="..\src\dquick\algorithms\weak.d">
+      <Link>dquick\algorithms\weak.d</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\dquick\etc\gl3n\bootDoc\.git">
