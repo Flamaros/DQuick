@@ -1,17 +1,19 @@
 module dquick.script.iItemBinding;
 
 import dquick.item.declarativeItem;
-import dquick.script.dmlEngine;
+import dquick.script.dmlEngineCore;
+import derelict.lua.lua;
 
-class IItemBinding {
+interface IItemBinding {
+	dquick.script.dmlEngineCore.DMLEngineCore	dmlEngine();
+	void										dmlEngine(dquick.script.dmlEngineCore.DMLEngineCore);
+	void	executeBindings();
+	static if (dquick.script.dmlEngineCore.DMLEngineCore.showDebug)
+		string	displayDependents();
+	bool	creating();
+	void	valueFromLua(lua_State* L);
+	void	pushToLua(lua_State* L);
+	int		itemBindingLuaEnvDummyClosureReference();
 
-	this()
-	{
-		creating = true;
-	}
-	dquick.script.dmlEngine.DMLEngine	dmlEngine() {return null;}
-	DeclarativeItem	declarativeItem() {return null;}
-	void	executeBindings() {};
-	string	displayDependents() {return "";};
-	bool	creating;
+	string	id();
 }

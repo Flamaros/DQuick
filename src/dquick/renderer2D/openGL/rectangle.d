@@ -10,6 +10,7 @@ import dquick.renderer3D.openGL.mesh;
 
 import dquick.maths.color;
 import dquick.maths.vector2f32;
+import dquick.maths.vector2s32;
 
 import derelict.opengl3.gl;
 
@@ -36,7 +37,7 @@ public:
 	{
 		mSize = newSize;
 		mUserSize = true;
-		updateMesh();
+		mMeshIsDirty = true;
 	}
 
 	Vector2f32	size()
@@ -51,7 +52,16 @@ public:
 
 	void	draw()
 	{
+		if(mMeshIsDirty)
+			updateMesh();
 		mMesh.draw();
+	}
+
+	@property Vector2s32	textureSize()
+	{
+		if (mMesh is null || mMesh.texture is null)
+			return Vector2s32(0, 0);
+		return mMesh.texture.size;
 	}
 
 private:
@@ -81,7 +91,6 @@ private:
 								mSize.x,	mSize.y,	0.0f],
 								cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
 
-
 		mMesh.texCoords.setArray(cast(GLfloat[])[
  								 0.0f, 0.0f,
  								 1.0f, 0.0f,
@@ -95,22 +104,27 @@ private:
 						 	  1.0f, 1.0f, 1.0f, 1.0f,
 						 	  1.0f, 1.0f, 1.0f, 1.0f],
 							  cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
+
+		mMeshIsDirty = false;
 	}
 
 	void	updateMesh()
 	{
-		create();
+		create();	// TODO find a way to avoid update just after creation
 
 		mMesh.vertices.updateArray(cast(GLfloat[])[
 			0.0f,		0.0f,		0.0f,
 			mSize.x,	0.0f,		0.0f,
 			0.0f,		mSize.y,	0.0f,
 			mSize.x,	mSize.y,	0.0f]);
+		
+		mMeshIsDirty = false;
 	}
 
 	bool			mUserSize;
 	Vector2f32		mSize;
 	Mesh			mMesh;
+	bool			mMeshIsDirty; // indicates that mesh has to be rebuilt in next draw() call.
 	Shader			mShader;
 	ShaderProgram	mShaderProgram;
 }

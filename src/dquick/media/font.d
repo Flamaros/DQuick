@@ -22,6 +22,7 @@ import std.conv;
 /**
 * One Font per size and style
 * kerning requested at runtime
+* Notice that all glyph bitmap contains an extra border of 1 pixel large to avoid issue with filtering
 **/
 
 // TODO The font manager have to find fonts files in system folders
@@ -220,7 +221,7 @@ public:
 			ftBitmap = ftBitmapGlyph.bitmap;
 		}
 
-		region = imageAtlas.allocateRegion(ftBitmap.width, ftBitmap.rows);
+		region = imageAtlas.allocateRegion(ftBitmap.width + 2, ftBitmap.rows + 2);
 		if (region.x < 0)
 		{
 			throw new Exception("Texture atlas is full. Instanciate a new one isn't supported yet");	// TODO
@@ -347,16 +348,16 @@ private:
 	void	blitGlyph(const ref FT_Bitmap ftBitmap, ref Glyph glyph)
 	{
 		glyph.image = new Image;
-		glyph.image.create("", glyph.atlasRegion.width, glyph.atlasRegion.height, 4);
+		glyph.image.create("", glyph.atlasRegion.width, glyph.atlasRegion.height, Image.Format.RGBA);
 
 		glyph.image.fill(Color(1.0f, 1.0f, 1.0f, 0.0f), Vector2s32(0, 0), Vector2s32(glyph.atlasRegion.width, glyph.atlasRegion.height));
 
-		assert(glyph.atlasRegion.width == ftBitmap.width);
-		assert(glyph.atlasRegion.height == ftBitmap.rows);
+		assert(glyph.atlasRegion.width == ftBitmap.width + 2);
+		assert(glyph.atlasRegion.height == ftBitmap.rows + 2);
 
 		size_t	depth;
-		uint	x = 0;
-		uint	y = 0;
+		uint	x = 1;
+		uint	y = 1;
 
 		depth = glyph.image.nbBytesPerPixel;
 		for (size_t i = 0; i < ftBitmap.width; i++)
@@ -368,7 +369,7 @@ private:
 				color[1] = 0;
 				color[2] = 0;
 				color[3] = ftBitmap.buffer[j * ftBitmap.pitch + i];
-				memcpy(glyph.image.pixels + ((y + j) * ftBitmap.width + (x + i)) * depth,
+				memcpy(glyph.image.pixels + ((y + j) * (ftBitmap.width + 2) + (x + i)) * depth,
 					   color.ptr,
 					   color.sizeof);
 			}
@@ -551,8 +552,8 @@ unittest
 {
 	version(Windows)
 	{
-		assert(fontPathFromFamily("Arial") == "C:/Windows/Fonts/arial.ttf");
-		assert(fontPathFromFamily("arial") == "C:/Windows/Fonts/arial.ttf");	// Test with wrong case
+		assert(icmp(fontPathFromFamily("Arial"), "C:/Windows/Fonts/arial.ttf") == 0 || icmp(fontPathFromFamily("Arial"), "C:/Windows/Fonts/Arialtbg.ttf") == 0);
+		assert(icmp(fontPathFromFamily("arial"), "C:/Windows/Fonts/arial.ttf") == 0 || icmp(fontPathFromFamily("arial"), "C:/Windows/Fonts/Arialtbg.ttf") == 0);	// Test with wrong case
 		assert(fontPathFromFamily("Arial", Font.Style.Bold | Font.Style.Italic) == "C:/Windows/Fonts/arialbi.ttf");
 		assert(fontPathFromFamily("Andalus", Font.Style.Bold) == "C:/Windows/Fonts/andlso.ttf");	// There is no bold file for this font, so the same file as for regular must be returned (because it can contains bold layout)
 	}
@@ -578,7 +579,7 @@ unittest
 	cursor.x = 0;
 	cursor.y = /*cast(int)font.linegap*/ 36;
 	textImage = new Image;
-	textImage.create("", 500, 100, 4);
+	textImage.create("", 500, 100, Image.Format.RGBA);
 	textImage.fill(Color(1.0f, 1.0f, 1.0f, 0.0f), Vector2s32(0, 0), textImage.size());
 
 	foreach (dchar charCode; text)
@@ -600,7 +601,7 @@ unittest
 				images[$ - 1].create(format("ImageAtlas-%d", images.length),
 									 fontManager.getAtlas(images.length - 1).size().x,
 									 fontManager.getAtlas(images.length - 1).size().y,
-									 4);
+									 Image.Format.RGBA);
 				images[$ - 1].fill(Color(1.0f, 1.0f, 1.0f, 1.0f), Vector2s32(0, 0), images[$ - 1].size());
 			}
 
@@ -622,7 +623,7 @@ unittest
 		cursor.x = cursor.x + glyph.advance.x;
 	}
 
-	textImage.save("../data/FontTestText.bmp");
+	textImage.save("../data/FontTestText.png");
 
 	fontManager.clear();
 }

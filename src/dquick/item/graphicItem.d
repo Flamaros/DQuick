@@ -4,12 +4,17 @@ public import dquick.item.declarativeItem;
 public import dquick.maths.vector2f32;
 public import dquick.maths.vector4f32;
 public import dquick.maths.transformation;
+public import dquick.maths.color;
 
 public import dquick.renderer3D.openGL.renderer;
+import dquick.renderer3D.openGL.mesh;
+import dquick.renderer3D.openGL.shader;
+import dquick.renderer3D.openGL.shaderProgram;
 
 public import std.signals;
 import std.stdio;
 import std.math;
+import std.variant;
 
 // TODO Verifier la gestion des matrices, j'ai un doute sur la bonne application/restoration des transformation (Je crains que la matrice de la camera soit ecrasee)
 
@@ -17,10 +22,17 @@ import std.math;
 class GraphicItem : DeclarativeItem
 {
 public:
-	this()
+	this(DeclarativeItem parent = null)
 	{
+		super(parent);
 		mSize = Vector2f32(0, 0);
 		mTransformationUpdated = true;
+		debug
+		{
+			mRebuildDebugMeshes = true;
+			mDebugMeshColor = [0.0f, 1.0f, 0.0f, 1.0f];
+			mDebugImplicitMeshColor = [0.0f, 1.0f, 0.0f, 1.0f];
+		}
 	}
 
 	@property void	x(float x)
@@ -56,6 +68,11 @@ public:
 		mTransformationUpdated = true;
 		onWidthChanged.emit(mSize.x);
 		onHeightChanged.emit(mSize.y);
+
+		debug
+		{
+			mRebuildDebugMeshes = true;
+		}
 	}
 
 	@property void	width(float width)
@@ -66,6 +83,11 @@ public:
 		mTransformation.origin.x = mSize.x / 2.0f;
 		mTransformationUpdated = true;
 		onWidthChanged.emit(width);
+
+		debug
+		{
+			mRebuildDebugMeshes = true;
+		}
 	}
 	@property float	width() {return mSize.x;}
 	mixin Signal!(float) onWidthChanged;
@@ -78,6 +100,11 @@ public:
 		mTransformation.origin.y = mSize.y / 2.0f;
 		mTransformationUpdated = true;
 		onHeightChanged.emit(height);
+
+		debug
+		{
+			mRebuildDebugMeshes = true;
+		}
 	}
 	@property float	height() {return mSize.y;}
 	mixin Signal!(float) onHeightChanged;
@@ -138,6 +165,52 @@ public:
 		endPaint();
 	}
 
+	/// Color will be used to draw the rectangle that represent the GraphicItem's size
+	@property void	debugMeshColor(Color color)
+	{
+		debug
+		{
+			mRebuildDebugMeshes = true;
+			mDebugMeshColor = color;
+			onDebugMeshColorChanged.emit(color);
+		}
+	}
+	@property Color	debugMeshColor()
+	{
+		debug
+		{
+			return mDebugMeshColor;
+		}
+		else
+		{
+			return Color();
+		}
+	}
+	mixin Signal!(Color) onDebugMeshColorChanged;
+
+	/// Color will be used to draw the rectangle that represent the GraphicItem's implicitSize
+	@property void	debugImplicitMeshColor(Color color)
+	{
+		debug
+		{
+			mRebuildDebugMeshes = true;
+			mDebugImplicitMeshColor = color;
+			onDebugImplicitMeshColorChanged.emit(color);
+		}
+	}
+	@property Color	debugImplicitMeshColor()
+	{
+		debug
+		{
+			return mDebugImplicitMeshColor;
+		}
+		else
+		{
+			return Color();
+		}
+	}
+	mixin Signal!(Color) onDebugImplicitMeshColorChanged;
+
 protected:
 	void	startPaint(bool transformationUpdated)
 	{
@@ -154,7 +227,7 @@ protected:
 
 		Renderer.currentMDVMatrix(switchMatrixRowsColumns(Renderer.currentCamera * mMatrix));
 
-		if (mClip)
+		if (mClip)	// TODO move that to the renderer (no gl commands have to be used here)
 		{
 			Vector4f32	pos = Vector4f32(x, y, 0.0f, 0.0f);
 			Vector4f32	size = Vector4f32(width, height, 0.0f, 0.0f);
@@ -167,6 +240,16 @@ protected:
 			float	invertedY = Renderer.viewportSize().y - pos.y - size.y;
 
 			glScissor(cast(int)round(pos.x), cast(int)round(invertedY), cast(int)round(size.x), cast(int)round(size.y));
+		}
+
+		debug
+		{
+			if (mRebuildDebugMeshes)
+				updateDebugMesh();
+			mDebugMesh.draw();
+			if ((implicitWidth != float.nan && implicitHeight != float.nan)
+				&& (implicitWidth != mSize.x && implicitHeight != mSize.y))
+				mDebugImplicitMesh.draw();
 		}
 	}
 
@@ -184,8 +267,117 @@ protected:
 		return false;
 	}
 
+	debug
+	{
+		void	createDebugMeshes()	// Safe to call it if mesh is already created
+		{
+			if (mDebugMesh)
+				return;
+
+			mDebugShaderProgram = new ShaderProgram();
+
+			Variant[] options;
+			options ~= Variant(import("color.vert"));
+			options ~= Variant(import("color.frag"));
+			mDebugShader = dquick.renderer3D.openGL.renderer.resourceManager.getResource!Shader("color", options);
+			mDebugShaderProgram.setProgram(mDebugShader.getProgram());
+
+			// Size
+			mDebugMesh = new Mesh();
+			mDebugMesh.setShader(mDebugShader);
+			mDebugMesh.setShaderProgram(mDebugShaderProgram);
+			mDebugMesh.primitiveType = Mesh.PrimitiveType.LineLoop;
+
+			mDebugMesh.indexes.setArray(cast(GLuint[])[0, 1, 2, 3],
+								   cast(GLenum)GL_ELEMENT_ARRAY_BUFFER, cast(GLenum)GL_STATIC_DRAW);
+
+			mDebugMesh.vertices.setArray(cast(GLfloat[])[
+				0.0f,		0.0f,		0.0f,
+				mSize.x,	0.0f,		0.0f,
+				mSize.x,	mSize.y,	0.0f,
+				0.0f,		mSize.y,	0.0f],
+											cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
+
+			mDebugMesh.colors.setArray(cast(GLfloat[])[
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w],
+										  cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
+
+			// ImplicitSize
+			mDebugImplicitMesh = new Mesh();
+			mDebugImplicitMesh.setShader(mDebugShader);
+			mDebugImplicitMesh.setShaderProgram(mDebugShaderProgram);
+			mDebugImplicitMesh.primitiveType = Mesh.PrimitiveType.LineLoop;
+
+			mDebugImplicitMesh.indexes.setArray(cast(GLuint[])[0, 1, 2, 3],
+										cast(GLenum)GL_ELEMENT_ARRAY_BUFFER, cast(GLenum)GL_STATIC_DRAW);
+
+			mDebugImplicitMesh.vertices.setArray(cast(GLfloat[])[
+				0.0f,			0.0f,			0.0f,
+				implicitWidth,	0.0f,			0.0f,
+				implicitWidth,	implicitHeight,	0.0f,
+				0.0f,			implicitHeight,	0.0f],
+										 cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
+
+			mDebugImplicitMesh.colors.setArray(cast(GLfloat[])[
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w],
+									   cast(GLenum)GL_ARRAY_BUFFER, cast(GLenum)GL_DYNAMIC_DRAW);
+
+			mRebuildDebugMeshes = false;
+		}
+
+		void	updateDebugMesh()
+		{
+			createDebugMeshes();	// TODO find a way to avoid update just after creation
+
+			// Size
+			mDebugMesh.vertices.updateArray(cast(GLfloat[])[
+				0.0f,		0.0f,		0.0f,
+				mSize.x,	0.0f,		0.0f,
+				mSize.x,	mSize.y,	0.0f,
+				0.0f,		mSize.y,	0.0f]);
+
+			mDebugMesh.colors.updateArray(cast(GLfloat[])[
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w,
+				mDebugMeshColor.x, mDebugMeshColor.y, mDebugMeshColor.z, mDebugMeshColor.w]);
+
+			// ImplicitSize
+			mDebugImplicitMesh.vertices.updateArray(cast(GLfloat[])[
+				0.0f,			0.0f,			0.0f,
+				implicitWidth,	0.0f,			0.0f,
+				implicitWidth,	implicitHeight,	0.0f,
+				0.0f,			implicitHeight,	0.0f]);
+
+			mDebugImplicitMesh.colors.updateArray(cast(GLfloat[])[
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w,
+				mDebugImplicitMeshColor.x, mDebugImplicitMeshColor.y, mDebugImplicitMeshColor.z, mDebugImplicitMeshColor.w]);
+
+			mRebuildDebugMeshes = false;
+		}
+	}
+
 	bool			mClip = false;
 	Transformation	mTransformation;
 	Vector2f32		mSize;
 	float			mOrientation = 0.0f;
+
+	debug
+	{
+		bool			mRebuildDebugMeshes;
+		Color			mDebugMeshColor;
+		Mesh			mDebugMesh;
+		Color			mDebugImplicitMeshColor;
+		Mesh			mDebugImplicitMesh;
+		Shader			mDebugShader;
+		ShaderProgram	mDebugShaderProgram;
+	}
 }

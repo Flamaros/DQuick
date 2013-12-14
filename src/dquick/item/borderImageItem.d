@@ -13,7 +13,16 @@ class BorderImageItem : GraphicItem
 {
 public:
 	alias BorderRectangle.TileMode	TileMode;
-
+	
+	this(DeclarativeItem parent = null)
+	{
+		super(parent);
+		debug
+		{
+			debugMeshColor(Color(128 / 255, 0 / 255, 255 / 255, 1.0f));
+		}
+	}
+	
 	override
 	void	paint(bool transformationUpdated)
 	{

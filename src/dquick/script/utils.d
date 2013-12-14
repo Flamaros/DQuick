@@ -8,6 +8,9 @@ import std.variant;
 import std.traits;
 import core.memory;
 import std.c.string;
+import std.algorithm;
+import std.stdio;
+import dquick.item.declarativeItem;
 
 string	repeat(string s, int count)
 {
@@ -41,12 +44,17 @@ string	getSignalNameFromPropertyName(string propertyName)
 	return "on" ~ toUpperCamelCase(propertyName) ~ "Changed";
 }
 
+string	getPropertyNameFromPropertyDeclaration(string declaration)
+{
+	if (endsWith(declaration, "Property"))
+		return declaration[0 .. declaration.length - "Property".length];
+	return "";
+}
+
 string	getPropertyNameFromSignalName(string signalName)
 {
-	auto reg = ctRegex!("^on(.+)Changed$");
-	auto	m = match(signalName, reg);
-	if (m)
-		return toLowerCamelCase(m.captures[1]);
+	if (startsWith(signalName, "on") && endsWith(signalName, "Changed"))
+		return toLowerCamelCase(signalName["on".length..signalName.length-"Changed".length]);
 	return "";
 }
 
@@ -80,14 +88,15 @@ string	getLuaTypeName(lua_State* L, int index)
 	}
 }
 
-T	valueFromLua(T)(lua_State* L, int index)
+void	valueFromLua(T)(lua_State* L, int index, ref T value)
 {
-	T	value;
+	assert(isPointer!T == false);
+
 	static if (is(T == Variant))
 	{
 		if (lua_isboolean(L, index))
-			value = lua_toboolean(L, index);
-		if (lua_isnumber(L, index))
+			value = cast(bool)lua_toboolean(L, index);
+		else if (lua_isnumber(L, index))
 			value = lua_tonumber(L, index);
 		else if (lua_isstring(L, index))
 			value = to!(string)(lua_tostring(L, index));
@@ -100,7 +109,7 @@ T	valueFromLua(T)(lua_State* L, int index)
 			throw new Exception(format("Lua value at index %d is a \"%s\", a boolean was expected\n", index, getLuaTypeName(L, index)));
 		value = cast(bool)lua_toboolean(L, index);
 	}
-	else static if (is(T == int) || is(T == enum))
+	else static if (is(T == int) || is(T == uint) || is(T == enum))
 	{
 		if (!lua_isnumber(L, index))
 			throw new Exception(format("Lua value at index %d is a \"%s\", a number was expected\n", index, getLuaTypeName(L, index)));
@@ -126,19 +135,22 @@ T	valueFromLua(T)(lua_State* L, int index)
 		{
 			if (!lua_isuserdata(L, index))
 				throw new Exception(format("Lua value at index %d is a \"%s\", a userdata or nil was expected\n", index, getLuaTypeName(L, index)));
-			void*	itemBindingPtr = *(cast(void**)lua_touserdata(L, index));
+
+			void*	itemBindingVoidPtr = *(cast(void**)lua_touserdata(L, index));
+			dquick.script.iItemBinding.IItemBinding	itemBindingPtr = cast(dquick.script.iItemBinding.IItemBinding)(itemBindingVoidPtr);
 			value = cast(T)(itemBindingPtr);
 		}
 	}
 	else
 	{
-		throw new Exception(format("Lua value at index %d is a \"%s\", a number, boolean or string was expected\n", index, getLuaTypeName(L, index)));
+		static assert(false, fullyQualifiedName2!(T));
 	}
-	return value;
 }
 
 void	valueToLua(T)(lua_State* L, T value)
 {
+	assert(isPointer!T == false);
+
 	static if (is(T == Variant))
 	{
 		if (value.type == typeid(double))
@@ -152,7 +164,7 @@ void	valueToLua(T)(lua_State* L, T value)
 		else
 			throw new Exception(format("Variant has type \"%s\", an int, double, bool or string was expected\n", value.type));
 	}
-	else static if (is(T == int) || is(T == enum))
+	else static if (is(T == int) || is(T == uint) || is(T == enum))
 		lua_pushinteger(L, value);
 	else static if (is(T == float))
 		lua_pushnumber(L, value);
@@ -162,22 +174,30 @@ void	valueToLua(T)(lua_State* L, T value)
 		lua_pushboolean(L, value);
 	else static if (is(T : dquick.script.iItemBinding.IItemBinding))
 	{
-		// Create a userdata that contains instance ptr and make it a global for user access
-		// It also contains a metatable for the member read and write acces
-		void*	itemBindingPtr = cast(void*)(value);
-		void*	userData = lua_newuserdata(L, itemBindingPtr.sizeof);
-		memcpy(userData, &itemBindingPtr, itemBindingPtr.sizeof);
+		if (value is null)
+			lua_pushnil(L);
+		else
+		{
+			DeclarativeItem	ditem = cast(DeclarativeItem)value;
 
-		lua_newtable(L);
+			// Create a userdata that contains instance ptr and make it a global for user access
+			// It also contains a metatable for the member read and write acces
+			dquick.script.iItemBinding.IItemBinding	iItemBinding = cast(dquick.script.iItemBinding.IItemBinding)value;
+			void*	iItemBindingVoidPtr = cast(void*)(iItemBinding);
+			void*	userData = lua_newuserdata(L, iItemBindingVoidPtr.sizeof);
+			memcpy(userData, &iItemBindingVoidPtr, iItemBindingVoidPtr.sizeof);
 
-		lua_pushstring(L, "__index");
-		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngine.indexLuaBind!T);
-		lua_settable(L, -3);
-		lua_pushstring(L, "__newindex");
-		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngine.newindexLuaBind!T);
-		lua_settable(L, -3);
+			lua_newtable(L);
 
-		lua_setmetatable(L, -2);
+			lua_pushstring(L, "__index");
+			lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.indexLuaBind!T);
+			lua_settable(L, -3);
+			lua_pushstring(L, "__newindex");
+			lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.newindexLuaBind!T);
+			lua_settable(L, -3);
+
+			lua_setmetatable(L, -2);
+		}
 	}
 	else
 	{
@@ -194,7 +214,7 @@ void	luaCallD(alias func)(lua_State* L, int firstParamIndex)
 	alias ParameterTypeTuple!func MyParameterTypeTuple;
 	MyParameterTypeTuple	parameterTuple;
 	foreach (index, paramType; MyParameterTypeTuple)
-		parameterTuple[index] = dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index);
+		dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index, parameterTuple[index]);
 	lua_pop(L, parameterTuple.length);
 
 	// Call D function
@@ -221,7 +241,7 @@ void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamInd
 	alias ParameterTypeTuple!(__traits(getMember, T, funcName)) MyParameterTypeTuple;
 	MyParameterTypeTuple	parameterTuple;
 	foreach (index, paramType; MyParameterTypeTuple)
-		parameterTuple[index] = dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index);
+		dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index, parameterTuple[index]);
 	lua_pop(L, parameterTuple.length);
 
 	// Call D function
@@ -241,12 +261,47 @@ void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamInd
 
 unittest
 {
-	assert(getSignalNameFromPropertyName("mouseX") == "onMouseXChanged");
-	assert(getSignalNameFromPropertyName("X") == "onXChanged");
-	assert(getSignalNameFromPropertyName("x") == "onXChanged");
+	static assert(getSignalNameFromPropertyName("mouseX") == "onMouseXChanged");
+	static assert(getSignalNameFromPropertyName("X") == "onXChanged");
+	static assert(getSignalNameFromPropertyName("x") == "onXChanged");
 
-	assert(getPropertyNameFromSignalName("onMouseXChanged") == "mouseX");
-	assert(getPropertyNameFromSignalName("onXChanged") == "x");
+	static assert(getPropertyNameFromSignalName("onMouseXChanged") == "mouseX");
+	static assert(getPropertyNameFromSignalName("onXChanged") == "x");
+
+	static assert(getPropertyNameFromPropertyDeclaration("mouseXProperty") == "mouseX");
+	static assert(getPropertyNameFromPropertyDeclaration("XProperty") == "X");
+	static assert(getPropertyNameFromPropertyDeclaration("xProperty") == "x");
+	static assert(getPropertyNameFromPropertyDeclaration("xProp") == "");
+}
+
+template PropertyType(T, string member) // Return the type of the property member from T class
+{
+	alias PropertyTypeImpl!(__traits(getOverloads, T, member))	PropertyType;
+}
+
+template PropertyTypeImpl(overloads...) // Transform types in ItemBindingBases
+{
+	static if (overloads.length == 0)
+		alias void	PropertyTypeImpl;
+	else
+	{
+		static if (!is(ReturnType!(overloads[0]) == void) && TypeTuple!(ParameterTypeTuple!(overloads[0])).length == 0)
+			alias ReturnType!(overloads[0]) PropertyTypeImpl;
+		else
+			alias PropertyTypeImpl!(overloads[1 .. $]) PropertyTypeImpl;
+	}
+}
+
+unittest
+{
+	class Test {
+		int	_prop;
+		short	prop() {return cast(short)_prop;}
+		int	prop() {return _prop;}
+		void	prop(int value) { _prop = value; }
+	}
+
+	static assert(is(PropertyType!(Test, "prop") == short));
 }
 
 

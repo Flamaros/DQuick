@@ -40,8 +40,10 @@ public:
 		Wrap			/// If possible, wrapping occurs at a word boundary; otherwise it will occur at the appropriate point on the line, even in the middle of a word.
 	}
 
-	this()
+	this(DeclarativeItem parent = null)
 	{
+		super(parent);
+		
 		Variant[] options;
 
 		options ~= Variant(import("rectangle.vert"));
@@ -49,6 +51,8 @@ public:
 		mShaderProgram = new ShaderProgram();
 		mShader = dquick.renderer3D.openGL.renderer.resourceManager.getResource!Shader("rectangle", options);
 		mShaderProgram.setProgram(mShader.getProgram());
+		debugMeshColor(Color(255 / 255, 255 / 255, 0 / 255, 1.0f));
+		debugImplicitMeshColor(Color(255 / 255, 0 / 255, 0 / 255, 1.0f));
 	}
 
 	@property void	text(string text)
@@ -62,14 +66,14 @@ public:
 
 	/// Giving an empty string will reset the default font
 	@property void	family(string family)
-	{
+ 	{
 		if (family.length)
 			mFamily = family;
-		else
+ 		else
 			mFamily = defaultFont;
-		mNeedRebuild = true;
+ 		mNeedRebuild = true;
 		onFamilyChanged.emit(family);
-	}
+ 	}
 	@property string	family() {return mFamily;}
 	mixin Signal!(string) onFamilyChanged;
 	
@@ -116,7 +120,11 @@ public:
 		if (mNeedRebuild)
 			rebuildMesh();
 		if (mMesh !is null)
+		{
+			if (mText == "")
+				int toto = 10;
 			mMesh.draw();
+		}
 		paintChildren();
 		endPaint();
 	}
@@ -146,9 +154,19 @@ public:
 		}
 		@property float	height() {return GraphicItem.height;}
 
-		@property float	implicitWidth() {return mImplicitSize.x;}
+		@property float	implicitWidth()
+		{
+			if (mNeedRebuild)
+				rebuildMesh();
+			return mImplicitSize.x;
+		}
 
-		@property float	implicitHeight() {return mImplicitSize.y;}
+		@property float	implicitHeight()
+		{
+			if (mNeedRebuild)
+				rebuildMesh();
+			return mImplicitSize.y;
+		}
 	}
 
 private:
@@ -165,12 +183,15 @@ private:
 	void	rebuildMesh()
 	{
 		mNeedRebuild = false;
-		clear(mMesh);
+		mMesh = null;
 		if (!mText.length)
+		{
+			setImplicitSize(Vector2f32(0.0f, 0.0f));
 			return;
+		}
 
-		Line[]	lines;
-		mImplicitSize = Vector2f32(0.0f, 0.0f);
+		Vector2f32	implicitSize = Vector2f32(0.0f, 0.0f);
+		Line[]		lines;
 
 		bool	updateTexture = false;	// True if a new glyph is loaded (this is a little optimization)
 
@@ -206,6 +227,9 @@ private:
 				glyph = glyphTuple[0];
 				alreadyLoaded = glyphTuple[1];
 
+				if (glyph.atlasRegion.width == 0 || glyph.atlasRegion.height == 0)
+					return glyph;
+
 				if (!alreadyLoaded)
 				{
 					updateTexture = true;
@@ -216,7 +240,7 @@ private:
 						mImages[$ - 1].create(format("ImageAtlas-%d", mImages.length),
 											  fontManager.getAtlas(mImages.length - 1).size().x,
 											  fontManager.getAtlas(mImages.length - 1).size().y,
-											  4);
+											  Image.Format.RGBA);
 						mImages[$ - 1].fill(Color(1.0f, 1.0f, 1.0f, 1.0f), Vector2s32(0, 0), mImages[$ - 1].size());
 					}
 
@@ -307,10 +331,10 @@ private:
 							lines[$ - 1].size.y = font.linegap();
 						// --
 
-						float	heightUnderOrigin = -font.underLinePosition() + font.underLineThickness();
+						float	heightUnderOrigin = /*-font.underLinePosition() + */font.underLineThickness();	// We want text fit just in implicitSize without extra marge (we detecte the lowest rendered pixel for the current line) 
 
-						if (lines[$ - 1].size.x > mImplicitSize.x)
-							mImplicitSize.x = lines[$ - 1].size.x;
+						if (lines[$ - 1].size.x > implicitSize.x)
+							implicitSize.x = lines[$ - 1].size.x;
 						if (heightUnderOrigin > lines[$ - 1].maxHeightUnderOrigin)
 							lines[$ - 1].maxHeightUnderOrigin = heightUnderOrigin;
 
@@ -323,7 +347,7 @@ private:
 			}
 
 			if (lines.length)
-				mImplicitSize.y = lines[$ - 1].verticalCursor + lines[$ - 1].maxHeightUnderOrigin;	// TODO clean that, it's not really exact (a little margin is necessary for character that can be draw under the cursor like 'g')
+				implicitSize.y = lines[$ - 1].verticalCursor + lines[$ - 1].maxHeightUnderOrigin;
 
 			// Building the Mesh
 			mMesh = new Mesh();
@@ -370,8 +394,7 @@ private:
 
 			mMesh.setTexture(mTextures[0]);
 			
-			onImplicitWidthChanged.emit(mImplicitSize.x);
-			onImplicitHeightChanged.emit(mImplicitSize.y);		
+			setImplicitSize(implicitSize);
 		}
 		catch (Exception e)
 		{
@@ -385,13 +408,14 @@ private:
 		float	x, y, width, height;
 		float	tX, tY, tWidth, tHeight;
 
+		// Notice we need manage the 1 pixel border around the glyph
 		x = origin.x;
 		y = origin.y;
-		width = glyph.atlasRegion.width;
-		height = glyph.atlasRegion.height;
+		width = glyph.atlasRegion.width - 2.0f;
+		height = glyph.atlasRegion.height - 2.0f;
 
-		tX = cast(float)glyph.atlasRegion.x / cast(float)atlasSize.x;
-		tY = cast(float)glyph.atlasRegion.y / cast(float)atlasSize.y;
+		tX = (cast(float)glyph.atlasRegion.x + 1.0f) / cast(float)atlasSize.x;
+		tY = (cast(float)glyph.atlasRegion.y + 1.0f) / cast(float)atlasSize.y;
 		tWidth = cast(float)width / cast(float)atlasSize.x;
 		tHeight = cast(float)height / cast(float)atlasSize.y;
 
@@ -402,15 +426,29 @@ private:
 			x,			y + height,	0.0f,
 			x + width,	y + height,	0.0f];
 		texCoords ~= cast(GLfloat[])[// Don't forget opengl is down to top oriented (left-top corner = 0,1 coords)
-			tX,				tY,
-			tX + tWidth,	tY,
-			tX,				tY + tHeight,
-			tX + tWidth,	tY + tHeight];
+			tX,				1.0f - tY,
+			tX + tWidth,	1.0f - tY,
+			tX,				1.0f - (tY + tHeight),
+			tX + tWidth,	1.0f - (tY + tHeight)];
 		colors~= cast(GLfloat[])[
 			1.0f, 1.0f, 1.0f, 1.0f,
 			1.0f, 1.0f, 1.0f, 1.0f,
 			1.0f, 1.0f, 1.0f, 1.0f,
 			1.0f, 1.0f, 1.0f, 1.0f];
+	}
+
+	void	setImplicitSize(Vector2f32 implicitSize)
+	{
+		if (implicitSize.x != mImplicitSize.x)
+		{
+			mImplicitSize.x = implicitSize.x;
+			onImplicitWidthChanged.emit(mImplicitSize.x);
+		}
+		if (implicitSize.y != mImplicitSize.y)
+		{
+			mImplicitSize.y = implicitSize.y;
+			onImplicitHeightChanged.emit(mImplicitSize.y);
+		}
 	}
 
 	static const string	defaultFont = "Verdana";
