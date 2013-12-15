@@ -1,0 +1,47 @@
+{
+	"name": "dquick",
+	"description": "A GUI library written in D.",
+	"authors": ["Bruno Deligny", "Xavier Bigand", "Piotr Podsiadly"],
+	"homepage": "https://github.com/D-Quick/DQuick",
+	"license": "BSL-1.0",
+
+	"stringImportPaths": ["src/dquick/renderer2D/openGL"],
+
+	"sourcePaths": ["src/dquick/algorithms",
+					"src/dquick/animation",
+					"src/dquick/etc/derelict/import/derelict/sdl2",
+					"src/dquick/etc/derelict/import/derelict/devil",
+					"src/dquick/etc/derelict/import/derelict/freetype",
+					"src/dquick/etc/derelict/import/derelict/lua",
+					"src/dquick/etc/derelict/import/derelict/opengl3",
+					"src/dquick/etc/derelict/import/derelict/util",
+					"src/dquick/etc/gl3n/gl3n",
+					"src/dquick/events",
+					"src/dquick/item",
+					"src/dquick/maths",
+					"src/dquick/media",
+					"src/dquick/renderer2D",
+					"src/dquick/renderer3D",
+					"src/dquick/script",
+					"src/dquick/system",
+					"src/dquick/utils"],
+
+	"sourcePaths-linux": ["src/dquick/etc/libX11/deimos/X11"],
+
+	"excludedSourceFiles": ["src/dquick/etc/derelict/build/build.d",
+							"src/dquick/etc/libX11/example.d"],
+	"buildRequirements": ["allowWarnings"],
+
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "library",
+			"excludedSourceFiles": ["src/dquick/main.d"]
+		},
+		{
+			"name": "unittest",
+			"targetType": "executable",
+			"mainSourceFile": "src/dquick/main.d"
+		}
+	]
+}
