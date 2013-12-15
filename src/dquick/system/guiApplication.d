@@ -46,16 +46,16 @@ version (Posix)
 	public import dquick.system.sdl.guiApplicationSDL;
 }
 
-shared static this()
+static this()
 {
-	writeln("dquick.system.guiApplication : shared static this()");
+	writeln("dquick.system.guiApplication : static this()");
 	DerelictGL.load();
 	DerelictLua.load();
 }
 
-shared static ~this()
+static ~this()
 {
-	writeln("dquick.system.guiApplication : shared static ~this()");
+	writeln("dquick.system.guiApplication : static ~this()");
 	DerelictLua.unload();
 	DerelictGL.unload();
 }
