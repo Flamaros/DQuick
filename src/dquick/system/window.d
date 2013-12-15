@@ -89,7 +89,9 @@ public:
 		mRootItem.setSize(Vector2f32(size()));
 	}
 
-	DMLEngine		dmlEngine() {return mScriptContext;}
+	GraphicItem	mainItem() {return mRootItem;}
+
+	DMLEngine	dmlEngine() {return mScriptContext;}
 
 protected:
 	void	destroy()

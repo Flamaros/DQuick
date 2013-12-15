@@ -215,6 +215,7 @@ class Window : WindowBase, IWindow
 	{
 		void		setMainItem(GraphicItem item) {super.setMainItem(item);}
 		void		setMainItem(string filePath) {super.setMainItem(filePath);}
+		GraphicItem	mainItem() {return super.mainItem();}
 		DMLEngine	dmlEngine() {return super.dmlEngine();}
 	}
 
@@ -254,8 +255,6 @@ class Window : WindowBase, IWindow
 	void	show()
 	{
 	}
-
-	GraphicItem	mainItem() {return mRootItem;}
 
 	void		setPosition(Vector2s32 newPosition)
 	{

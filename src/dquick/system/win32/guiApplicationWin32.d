@@ -93,6 +93,7 @@ version (Windows)
 		{
 			void		setMainItem(GraphicItem item) {super.setMainItem(item);}
 			void		setMainItem(string filePath) {super.setMainItem(filePath);}
+			GraphicItem	mainItem() {return super.mainItem();}
 			DMLEngine	dmlEngine() {return super.dmlEngine();}
 		}
 
@@ -231,8 +232,6 @@ version (Windows)
 			SetFocus(mhWnd);								// Sets Keyboard Focus To The Window
 			UpdateWindow(mhWnd);
 		}
-
-		GraphicItem	mainItem() {return mRootItem;}
 
 		void		setPosition(Vector2s32 newPosition)
 		{

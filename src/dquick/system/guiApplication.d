@@ -42,9 +42,11 @@ protected:
 		Scheduler.terminateAll();
 	}
 
+	bool	mQuit = false;
+
+private:
 	string	mApplicationDisplayName = "DQuick - Application";
 	bool	mInitialized = false;
-	bool	mQuit = false;
 }
 
 version (Windows)
