@@ -24,41 +24,32 @@ import std.stdio;
 import std.path;
 
 import derelict.sdl2.sdl;
-import derelict.sdl2.image;
-import derelict.lua.lua;
 
 shared static this()
 {
+	writeln("dquick.system.sdl.guiApplicationSDL : shared static this()");
 	DerelictSDL2.load();
-	DerelictSDL2Image.load();
-	DerelictGL.load();
-	DerelictLua.load();
 }
 
 shared static ~this()
 {
-	DerelictLua.unload();
-	DerelictGL.unload();
-	DerelictSDL2Image.unload();
+	writeln("dquick.system.sdl.guiApplicationSDL : shared static ~this()");
 	DerelictSDL2.unload();
 }
 
-class GuiApplication : IGuiApplication
+class GuiApplication : GuiApplicationBase, IGuiApplication
 {
 public:
 	shared static this()
 	{
 		if (SDL_Init(SDL_INIT_VIDEO) < 0)
 			throwError();
-		IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
 	}
 
 	shared static ~this()
 	{
-		destroy(resourceManager);	// Release latest resources because application is exiting
-		destroy(mInstance);
+		mInstance = null;
 
-		IMG_Quit();
 		SDL_Quit();
 	}
 
@@ -69,19 +60,12 @@ public:
 		return mInstance;
 	}
 
-	void	setApplicationArguments(string[] args)
+	override
 	{
-		assert(mInitialized == false);
-
-		mApplicationDirectory = dirName(args[0]) ~ dirSeparator;
-
-		mInitialized = true;
+		void	setApplicationArguments(string[] args) {super.setApplicationArguments(args);}
+		void	setApplicationDisplayName(string name) {super.setApplicationDisplayName(name);}
+		string	applicationDisplayName() {return super.applicationDisplayName();}
 	}
-
-	void	setApplicationDisplayName(string name) {mApplicationDisplayName = name;}
-	string	applicationDisplayName() {return mApplicationDisplayName;}
-
-	string	directoryPath() {return mApplicationDirectory;}	/// Return the path of this application
 
 	int	execute()
 	{
@@ -184,7 +168,7 @@ public:
 				foreach (Window window; mWindows)
 					window.onPaint();
 		}
-		
+
 		Scheduler.terminateAll();		
 		return 0;
 	}
@@ -234,7 +218,6 @@ private:
 	bool			mQuit = false;
 	string			mApplicationDisplayName = "DQuick - Application";
 	string			mApplicationDirectory = ".";
-	bool			mInitialized = false;
 }
 
 //==========================================================================

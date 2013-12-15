@@ -26,23 +26,14 @@ version (Windows)
 
 	import dquick.system.win32.openglContextWin32;
 
-	import derelict.lua.lua;
-
-	shared static this()
-	{
-		DerelictGL.load();
-		DerelictLua.load();
-	}
-
-	shared static ~this()
-	{
-		DerelictLua.unload();
-		DerelictGL.unload();
-	}
-
-	class GuiApplication : IGuiApplication
+	class GuiApplication : GuiApplicationBase, IGuiApplication
 	{
 	public:
+		shared static ~this()
+		{
+			mInstance = null;
+		}
+
 		static GuiApplication	instance()
 		{
 			if (mInstance is null)
@@ -50,19 +41,12 @@ version (Windows)
 			return mInstance;
 		}
 
-		void	setApplicationArguments(string[] args)
+		override
 		{
-			assert(mInitialized == false);
-
-			mApplicationDirectory = dirName(args[0]) ~ dirSeparator;
-
-			mInitialized = true;
+			void	setApplicationArguments(string[] args) {super.setApplicationArguments(args);}
+			void	setApplicationDisplayName(string name) {super.setApplicationDisplayName(name);}
+			string	applicationDisplayName() {return super.applicationDisplayName();}
 		}
-
-		void	setApplicationDisplayName(string name) {mApplicationDisplayName = name;}
-		string	applicationDisplayName() {return mApplicationDisplayName;}
-
-		string	directoryPath() {return mApplicationDirectory;}	/// Return the path of this application
 
 		int	execute()
 		{
@@ -94,18 +78,15 @@ version (Windows)
 	private:
 		this() {}
 
-		static void	registerWindow(Window window, HWND windowHandle)
+		void	registerWindow(Window window, HWND windowHandle)
 		{
 			mWindows[windowHandle] = window;
 		}
 
 		static GuiApplication	mInstance;
-		static bool				mQuit = false;
+		bool					mQuit = false;
 
-		static string		mApplicationDisplayName = "DQuick - Application";
-		static string		mApplicationDirectory = ".";
-		static bool			mInitialized = false;
-		static Window[HWND]	mWindows;
+		Window[HWND]	mWindows;
 	}
 
 	//==========================================================================
@@ -241,7 +222,7 @@ version (Windows)
 			Renderer.initialize();
 			mContext.resize(size().x, size().y);
 
-			GuiApplication.registerWindow(this, mhWnd);
+			GuiApplication.instance().registerWindow(this, mhWnd);
 
 			return true;
 		}
@@ -413,10 +394,10 @@ version (Windows)
 				case WM_MOVING:		// position de la fenetre
 					position.x = LOWORD(lParam);
 					position.y = HIWORD(lParam);
-					if (hWnd in GuiApplication.mWindows)
+					if (hWnd in GuiApplication.instance().mWindows)
 					{
-						GuiApplication.mWindows[hWnd].setPosition(position);
-						GuiApplication.mWindows[hWnd].onPaint();
+						GuiApplication.instance().mWindows[hWnd].setPosition(position);
+						GuiApplication.instance().mWindows[hWnd].onPaint();
 					}
 					return 0;
 				case WM_SIZE:
@@ -428,18 +409,18 @@ version (Windows)
 							GuiApplication.mWindows[hWnd].setMaximized(false);*/
 					size.x = LOWORD(lParam);
 					size.y = HIWORD(lParam);
-					if (hWnd in GuiApplication.mWindows)
-						GuiApplication.mWindows[hWnd].setSize(size);
+					if (hWnd in GuiApplication.instance().mWindows)
+						GuiApplication.instance().mWindows[hWnd].setSize(size);
 					return 0;
 				case WM_COMMAND:
 					break;
 				case WM_PAINT:
-					if (hWnd in GuiApplication.mWindows)
-						GuiApplication.mWindows[hWnd].onPaint();
+					if (hWnd in GuiApplication.instance().mWindows)
+						GuiApplication.instance().mWindows[hWnd].onPaint();
 					break;
 				case WM_DESTROY:
-					if (hWnd in GuiApplication.mWindows)
-						GuiApplication.mWindows[hWnd].destroy();
+					if (hWnd in GuiApplication.instance().mWindows)
+						GuiApplication.instance().mWindows[hWnd].destroy();
 					PostQuitMessage(0);
 					break;
 
@@ -449,31 +430,31 @@ version (Windows)
 					position.y = GET_Y_LPARAM(lParam);
 					mouseEvent.type = MouseEvent.Type.Motion;
 					mouseEvent.position = position;
-					GuiApplication.mWindows[hWnd].onMouseEvent(mouseEvent);
+					GuiApplication.instance().mWindows[hWnd].onMouseEvent(mouseEvent);
 					return 0;
 				case WM_LBUTTONDOWN:
 					mouseEvent.type = MouseEvent.Type.ButtonPressed;
 					mouseEvent.buttons = MouseEvent.Buttons.Left;
 					SetCapture(hWnd);
-					GuiApplication.mWindows[hWnd].onMouseEvent(mouseEvent);
+					GuiApplication.instance().mWindows[hWnd].onMouseEvent(mouseEvent);
 					return 0;
 				case WM_LBUTTONUP:
 					mouseEvent.type = MouseEvent.Type.ButtonReleased;
 					mouseEvent.buttons = MouseEvent.Buttons.Left;
 					ReleaseCapture();
-					GuiApplication.mWindows[hWnd].onMouseEvent(mouseEvent);
+					GuiApplication.instance().mWindows[hWnd].onMouseEvent(mouseEvent);
 					return 0;
 				case WM_RBUTTONDOWN:
 					mouseEvent.type = MouseEvent.Type.ButtonPressed;
 					mouseEvent.buttons = MouseEvent.Buttons.Right;
 					SetCapture(hWnd);
-					GuiApplication.mWindows[hWnd].onMouseEvent(mouseEvent);
+					GuiApplication.instance().mWindows[hWnd].onMouseEvent(mouseEvent);
 					return 0;
 				case WM_RBUTTONUP:
 					mouseEvent.type = MouseEvent.Type.ButtonReleased;
 					mouseEvent.buttons = MouseEvent.Buttons.Right;
 					ReleaseCapture();
-					GuiApplication.mWindows[hWnd].onMouseEvent(mouseEvent);
+					GuiApplication.instance().mWindows[hWnd].onMouseEvent(mouseEvent);
 					return 0;
 
 				default:

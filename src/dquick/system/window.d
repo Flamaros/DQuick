@@ -29,3 +29,7 @@ interface IWindow
 
 	// TODO rajouter les flag maximized et minimized, comme ce sont des etats eclusifs, les mettre en enum avec le fullscreen
 }
+
+class WindowBase
+{
+}
