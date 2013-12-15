@@ -1,29 +1,14 @@
 module dquick.system.sdl.guiApplicationSDL;
 
-// TODO voir comment partager plus de code avec la version windows, notamment le comptage des fenetres,...
 import dquick.system.guiApplication;
-import dquick.item.declarativeItem;
-import dquick.item.graphicItem;
-import dquick.system.window;
-import dquick.maths.vector2s32;
-import dquick.maths.vector2f32;
 import dquick.system.sdl.openglContextSDL;
-import dquick.renderer3D.openGL.renderer;
-import dquick.events.mouseEvent;
-import dquick.item.imageItem;
-import dquick.item.textItem;
-import dquick.item.borderImageItem;
-import dquick.item.mouseAreaItem;
-import dquick.item.scrollViewItem;
-import dquick.script.dmlEngine;
-import dquick.algorithms.scheduler;
+
+import derelict.sdl2.sdl;
 
 import std.string;
 import std.exception;
 import std.stdio;
 import std.path;
-
-import derelict.sdl2.sdl;
 
 shared static this()
 {
@@ -65,6 +50,7 @@ public:
 		void	setApplicationArguments(string[] args) {super.setApplicationArguments(args);}
 		void	setApplicationDisplayName(string name) {super.setApplicationDisplayName(name);}
 		string	applicationDisplayName() {return super.applicationDisplayName();}
+		void	quit() {super.quit();}
 	}
 
 	int	execute()
@@ -168,14 +154,8 @@ public:
 				foreach (Window window; mWindows)
 					window.onPaint();
 		}
-
-		Scheduler.terminateAll();		
+		terminateExecution();
 		return 0;
-	}
-
-	void	quit()
-	{
-		mQuit = true;
 	}
 
 	//==========================================================================
@@ -214,10 +194,6 @@ private:
 
 	static GuiApplication	mInstance;
 	static Window[Uint32]	mWindows;
-
-	bool			mQuit = false;
-	string			mApplicationDisplayName = "DQuick - Application";
-	string			mApplicationDirectory = ".";
 }
 
 //==========================================================================

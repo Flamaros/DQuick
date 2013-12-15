@@ -1,7 +1,20 @@
 module dquick.system.window;
 
-import dquick.item.graphicItem;
-import dquick.maths.vector2s32;
+public import dquick.item.declarativeItem;
+public import dquick.item.graphicItem;
+public import dquick.item.imageItem;
+public import dquick.item.textItem;
+public import dquick.item.borderImageItem;
+public import dquick.item.mouseAreaItem;
+public import dquick.item.scrollViewItem;
+
+public import dquick.maths.vector2s32;
+
+public import dquick.renderer3D.openGL.renderer;
+
+public import dquick.events.mouseEvent;
+
+public import dquick.script.dmlEngine;
 
 interface IWindow
 {

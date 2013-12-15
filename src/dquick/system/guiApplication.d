@@ -1,6 +1,8 @@
 module dquick.system.guiApplication;
 
-import dquick.utils.resourceManager;
+public import dquick.system.window;
+
+import dquick.algorithms.scheduler;
 
 import derelict.opengl3.gl;
 import derelict.lua.lua;
@@ -32,9 +34,17 @@ public:
 	void	setApplicationDisplayName(string name) {mApplicationDisplayName = name;}
 	string	applicationDisplayName() {return mApplicationDisplayName;}
 
+	void	quit() {mQuit = true;}
+
 protected:
+	void	terminateExecution()
+	{
+		Scheduler.terminateAll();
+	}
+
 	string	mApplicationDisplayName = "DQuick - Application";
 	bool	mInitialized = false;
+	bool	mQuit = false;
 }
 
 version (Windows)

@@ -3,16 +3,7 @@ module dquick.system.win32.guiApplicationWin32;
 version (Windows)
 {
 	import dquick.system.guiApplication;
-	import dquick.item.declarativeItem;
-	import dquick.item.graphicItem;
-	import dquick.system.window;
-	import dquick.maths.vector2s32;
-	import dquick.item.imageItem;
-	import dquick.item.textItem;
-	import dquick.item.borderImageItem;
-	import dquick.item.mouseAreaItem;
-	import dquick.item.scrollViewItem;
-	import dquick.script.dmlEngine;
+	import dquick.system.win32.openglContextWin32;
 
 	import std.stdio;
 	import std.c.stdlib;
@@ -23,8 +14,6 @@ version (Windows)
 
 	import std.c.windows.windows;
 	pragma(lib, "gdi32.lib");
-
-	import dquick.system.win32.openglContextWin32;
 
 	class GuiApplication : GuiApplicationBase, IGuiApplication
 	{
@@ -46,6 +35,7 @@ version (Windows)
 			void	setApplicationArguments(string[] args) {super.setApplicationArguments(args);}
 			void	setApplicationDisplayName(string name) {super.setApplicationDisplayName(name);}
 			string	applicationDisplayName() {return super.applicationDisplayName();}
+			void	quit() {super.quit();}
 		}
 
 		int	execute()
@@ -64,12 +54,8 @@ version (Windows)
 					foreach (Window window; mWindows)
 						window.onPaint();
 			}
+			terminateExecution();
 			return msg.wParam;
-		}
-
-		void	quit()
-		{
-			mQuit = true;
 		}
 
 		//==========================================================================
@@ -84,7 +70,6 @@ version (Windows)
 		}
 
 		static GuiApplication	mInstance;
-		bool					mQuit = false;
 
 		Window[HWND]	mWindows;
 	}
