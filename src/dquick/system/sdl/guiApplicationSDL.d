@@ -22,7 +22,7 @@ shared static ~this()
 	DerelictSDL2.unload();
 }
 
-class GuiApplication : GuiApplicationBase, IGuiApplication
+final class GuiApplication : GuiApplicationBase, IGuiApplication
 {
 public:
 	shared static this()
@@ -199,7 +199,7 @@ private:
 //==========================================================================
 //==========================================================================
 
-class Window : WindowBase, IWindow
+final class Window : WindowBase, IWindow
 {
 	this()
 	{
@@ -266,13 +266,11 @@ class Window : WindowBase, IWindow
 	}
 	Vector2s32	position() {return mPosition;}
 
-	void		setSize(Vector2s32 newSize)
+	override void		setSize(Vector2s32 newSize)
 	{
+		super.setSize(newSize);
+
 		mSize = newSize;
-
-		if (mRootItem)
-			mRootItem.setSize(Vector2f32(newSize));
-
 		SDL_SetWindowSize(mWindow, mSize.x, mSize.y);
 
 		if (mContext)
@@ -296,36 +294,32 @@ class Window : WindowBase, IWindow
 	//==========================================================================
 
 protected:
-	override void	destroy()
+	override
 	{
-		if (mWindow)
+		void	destroy()
 		{
-			mContext = null;
-			SDL_DestroyWindow(mWindow);
-			mWindow = null;
+			if (mWindow)
+			{
+				mContext = null;
+				SDL_DestroyWindow(mWindow);
+				mWindow = null;
+			}
 		}
+
+		void	onPaint()
+		{
+			Renderer.startFrame();
+
+			super.onPaint();
+
+			if (mContext)
+				mContext.swapBuffers();
+		}
+
+		void	onMouseEvent(MouseEvent mouseEvent) {super.onMouseEvent(mouseEvent);}
 	}
 
 private:
-	void	onPaint()
-	{
-		Renderer.startFrame();
-
-		if (mRootItem)
-			mRootItem.paint(false);
-
-		if (mContext)
-			mContext.swapBuffers();
-	}
-
-	void	onMouseEvent(MouseEvent mouseEvent)
-	{
-		if (mRootItem)
-		{
-			mRootItem.mouseEvent(mouseEvent);
-		}
-	}
-
 	static int	mWindowsCounter = 0;
 	int			mWindowId;
 

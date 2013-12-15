@@ -15,7 +15,7 @@ version (Windows)
 	import std.c.windows.windows;
 	pragma(lib, "gdi32.lib");
 
-	class GuiApplication : GuiApplicationBase, IGuiApplication
+	final class GuiApplication : GuiApplicationBase, IGuiApplication
 	{
 	public:
 		shared static ~this()
@@ -77,7 +77,7 @@ version (Windows)
 	//==========================================================================
 	//==========================================================================
 
-	class Window : WindowBase, IWindow
+	final class Window : WindowBase, IWindow
 	{
 		this()
 		{
@@ -233,7 +233,7 @@ version (Windows)
 			UpdateWindow(mhWnd);
 		}
 
-		void		setPosition(Vector2s32 newPosition)
+		void	setPosition(Vector2s32 newPosition)
 		{
 			// TODO
 			if (fullScreen()/* || maximized()*/)	// Will put corrupted values
@@ -252,12 +252,11 @@ version (Windows)
 		}
 		Vector2s32	position() {return mPosition;}
 
-		void	setSize(Vector2s32 newSize)
+		override void	setSize(Vector2s32 newSize)
 		{
-			mSize = newSize;
+			super.setSize(newSize);
 
-			if (mRootItem)
-				mRootItem.setSize(Vector2f32(newSize));
+			mSize = newSize;
 
 			// Resizing Window
 			RECT	rcClient, rcWindow;
@@ -289,33 +288,29 @@ version (Windows)
 		//==========================================================================
 
 	protected:
-		override void	destroy()
+		override
 		{
-			mContext = null;
-			DestroyWindow(mhWnd);
-			super.destroy();
+			void	destroy()
+			{
+				mContext = null;
+				DestroyWindow(mhWnd);
+				super.destroy();
+			}
+
+			void	onPaint()
+			{
+				Renderer.startFrame();
+
+				super.onPaint();
+
+				if (mContext)
+					mContext.swapBuffers();
+			}
+
+			void	onMouseEvent(MouseEvent mouseEvent) {super.onMouseEvent(mouseEvent);}
 		}
 
 	private:
-		void	onPaint()
-		{
-			Renderer.startFrame();
-
-			if (mRootItem)
-				mRootItem.paint(false);
-
-			if (mContext)
-				mContext.swapBuffers();
-		}
-
-		void	onMouseEvent(MouseEvent mouseEvent)
-		{
-			if (mRootItem)
-			{
-				mRootItem.mouseEvent(mouseEvent);
-			}
-		}
-
 		static int	mWindowsCounter = 0;
 		int			mWindowId;
 

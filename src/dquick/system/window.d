@@ -43,6 +43,8 @@ public:
 
 protected:
 	void	destroy();	/// If call on main Window (first instancied) the application will exit. This method is only called by the destructor
+	void	onPaint();
+	void	onMouseEvent(MouseEvent mouseEvent);
 
 	// TODO rajouter les flag maximized et minimized, comme ce sont des etats eclusifs, les mettre en enum avec le fullscreen
 }
@@ -93,6 +95,12 @@ public:
 
 	DMLEngine	dmlEngine() {return mScriptContext;}
 
+	void	setSize(Vector2s32 newSize)
+	{
+		if (mRootItem)
+			mRootItem.setSize(Vector2f32(newSize));
+	}
+
 protected:
 	void	destroy()
 	{
@@ -104,6 +112,21 @@ protected:
 		}
 	}
 
+	void	onPaint()
+	{
+		if (mRootItem)
+			mRootItem.paint(false);
+	}
+
+	void	onMouseEvent(MouseEvent mouseEvent)
+	{
+		if (mRootItem)
+		{
+			mRootItem.mouseEvent(mouseEvent);
+		}
+	}
+
+private:
 	DMLEngine	mScriptContext;
 	GraphicItem	mRootItem;
 }
