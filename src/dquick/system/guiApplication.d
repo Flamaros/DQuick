@@ -22,7 +22,7 @@ interface IGuiApplication
 	void	quit();
 }
 
-class GuiApplicationBase
+abstract class GuiApplicationBase : IGuiApplication
 {
 public:
 	void	setApplicationArguments(string[] args)

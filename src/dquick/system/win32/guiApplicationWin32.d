@@ -77,25 +77,23 @@ version (Windows)
 	//==========================================================================
 	//==========================================================================
 
-	class Window : IWindow
+	class Window : WindowBase, IWindow
 	{
 		this()
 		{
 			mWindowId = mWindowsCounter++;
-			mScriptContext = new DMLEngine;
-			mScriptContext.create();
-			mScriptContext.addItemType!(DeclarativeItem, "Item")();
-			mScriptContext.addItemType!(GraphicItem, "GraphicItem")();
-			mScriptContext.addItemType!(ImageItem, "Image")();
-			mScriptContext.addItemType!(TextItem, "Text")();
-			mScriptContext.addItemType!(BorderImageItem, "BorderImage")();
-			mScriptContext.addItemType!(MouseAreaItem, "MouseArea")();
-			mScriptContext.addItemType!(ScrollViewItem, "ScrollView")();
 		}
 
 		~this()
 		{
-			destroy();
+			mWindowsCounter--;
+		}
+
+		override
+		{
+			void		setMainItem(GraphicItem item) {super.setMainItem(item);}
+			void		setMainItem(string filePath) {super.setMainItem(filePath);}
+			DMLEngine	dmlEngine() {return super.dmlEngine();}
 		}
 
 		bool	create()
@@ -217,6 +215,11 @@ version (Windows)
 			return mhWnd != null;
 		}
 
+		bool	isMainWindow() const
+		{
+			return (mWindowId == 0);
+		}
+
 		void	show()
 		{
 			// TODO
@@ -227,38 +230,6 @@ version (Windows)
 			SetForegroundWindow(mhWnd);						// Slightly Higher Priority
 			SetFocus(mhWnd);								// Sets Keyboard Focus To The Window
 			UpdateWindow(mhWnd);
-		}
-
-		void	destroy()
-		{
-			.destroy(mScriptContext);
-			.destroy(mContext);
-			mContext = null;
-			DestroyWindow(mhWnd);
-			if (mWindowId == 0)
-				GuiApplication.instance.quit();
-		}
-
-		/// Window will take size of this item
-		void	setMainItem(GraphicItem item)
-		{
-			mRootItem = item;
-			/*
-			GraphicItem	graphicItem = cast(GraphicItem)mRootItem;
-			if (graphicItem)
-			setSize(graphicItem.size);*/
-		}
-
-		/// Window will take size of this item
-		void	setMainItem(string filePath)
-		{
-			mScriptContext.executeFile(filePath);
-
-			mRootItem = mScriptContext.rootItem!GraphicItem();
-			if (mRootItem is null)
-				throw new Exception("There is no root item or it's not a GraphicItem");
-
-			mRootItem.setSize(Vector2f32(size()));
 		}
 
 		GraphicItem	mainItem() {return mRootItem;}
@@ -315,10 +286,16 @@ version (Windows)
 			return Vector2s32(rc.right - rc.left, rc.bottom - rc.top);
 		}
 
-		DMLEngine	dmlEngine() {return mScriptContext;}
+		//==========================================================================
+		//==========================================================================
 
-		//==========================================================================
-		//==========================================================================
+	protected:
+		override void	destroy()
+		{
+			mContext = null;
+			DestroyWindow(mhWnd);
+			super.destroy();
+		}
 
 	private:
 		void	onPaint()
@@ -340,14 +317,11 @@ version (Windows)
 			}
 		}
 
-		DMLEngine	mScriptContext;
-
 		static int	mWindowsCounter = 0;
 		int			mWindowId;
 
 		HWND		mhWnd = null;
 		string		mWindowName = "";
-		GraphicItem	mRootItem;
 		Vector2s32	mPosition;
 		Vector2s32	mSize = Vector2s32(640, 480);
 		bool		mFullScreen = false;

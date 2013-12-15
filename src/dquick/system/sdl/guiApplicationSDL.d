@@ -199,25 +199,23 @@ private:
 //==========================================================================
 //==========================================================================
 
-class Window : IWindow
+class Window : WindowBase, IWindow
 {
 	this()
 	{
 		mWindowId = mWindowsCounter++;
-		mScriptContext = new DMLEngine;
-		mScriptContext.create();
-		mScriptContext.addItemType!(DeclarativeItem, "Item")();
-		mScriptContext.addItemType!(GraphicItem, "GraphicItem")();
-		mScriptContext.addItemType!(ImageItem, "Image")();
-		mScriptContext.addItemType!(TextItem, "Text")();
-		mScriptContext.addItemType!(BorderImageItem, "BorderImage")();
-		mScriptContext.addItemType!(MouseAreaItem, "MouseArea")();
-		mScriptContext.addItemType!(ScrollViewItem, "ScrollView")();
 	}
 
 	~this()
 	{
-		destroy();
+		mWindowsCounter--;
+	}
+
+	override
+	{
+		void		setMainItem(GraphicItem item) {super.setMainItem(item);}
+		void		setMainItem(string filePath) {super.setMainItem(filePath);}
+		DMLEngine	dmlEngine() {return super.dmlEngine();}
 	}
 
 	bool	create()
@@ -248,43 +246,13 @@ class Window : IWindow
 		return (mWindow !is null);
 	}
 
+	bool	isMainWindow() const
+	{
+		return (mWindowId == 0);
+	}
+
 	void	show()
 	{
-	}
-
-	void	destroy()
-	{
-		if (mWindow)
-		{
-			.destroy(mScriptContext);
-			.destroy(mContext);
-			SDL_DestroyWindow(mWindow);
-			mWindow = null;
-			if (mWindowId == 0)
-				GuiApplication.instance.quit();
-		}
-	}
-
-	/// Window will take size of this item
-	void	setMainItem(GraphicItem item)
-	{
-		mRootItem = item;
-/*
-		GraphicItem	graphicItem = cast(GraphicItem)mRootItem;
-		if (graphicItem)
-			setSize(graphicItem.size);*/
-	}
-
-	/// Window will take size of this item
-	void	setMainItem(string filePath)
-	{
-		mScriptContext.executeFile(filePath);
-
-		mRootItem = mScriptContext.rootItem!GraphicItem();
-		if (mRootItem is null)
-			throw new Exception("There is no root item or it's not a GraphicItem");
-
-		mRootItem.setSize(Vector2f32(size()));
 	}
 
 	GraphicItem	mainItem() {return mRootItem;}
@@ -328,6 +296,17 @@ class Window : IWindow
 	//==========================================================================
 	//==========================================================================
 
+protected:
+	override void	destroy()
+	{
+		if (mWindow)
+		{
+			mContext = null;
+			SDL_DestroyWindow(mWindow);
+			mWindow = null;
+		}
+	}
+
 private:
 	void	onPaint()
 	{
@@ -348,13 +327,10 @@ private:
 		}
 	}
 
-	DMLEngine	mScriptContext;
-
 	static int	mWindowsCounter = 0;
 	int			mWindowId;
 
 	string		mWindowName = "";
-	GraphicItem	mRootItem;
 	Vector2s32	mPosition;
 	Vector2s32	mSize = Vector2s32(640, 480);
 	bool		mFullScreen = false;
