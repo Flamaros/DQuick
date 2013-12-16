@@ -55,7 +55,7 @@ version (Windows)
 						window.onPaint();
 			}
 			terminateExecution();
-			return msg.wParam;
+			return cast(int)msg.wParam;
 		}
 
 		//==========================================================================
