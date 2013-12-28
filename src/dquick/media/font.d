@@ -444,8 +444,8 @@ shared static this()
 shared static ~this()
 {
 	writeln("dquick.media.font : shared static ~this()");
-	DerelictFT.unload();
 	FcFini();
+	DerelictFT.unload();
 	DerelictFontConfig.unload();
 }
 

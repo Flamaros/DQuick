@@ -82,20 +82,14 @@ version (linux)
 			return mInstance;
 		}
 
-		void	setApplicationArguments(string[] args)
+		override
 		{
-			assert(mInitialized == false);
-
-			mApplicationDirectory = dirName(args[0]) ~ dirSeparator;
-
-			mInitialized = true;
+			void	setApplicationArguments(string[] args) {super.setApplicationArguments(args);}
+			void	setApplicationDisplayName(string name) {super.setApplicationDisplayName(name);}
+			string	applicationDisplayName() {return super.applicationDisplayName();}
+			void	quit() {super.quit();}
 		}
-
-		void	setApplicationDisplayName(string name) {mApplicationDisplayName = name;}
-		string	applicationDisplayName() {return mApplicationDisplayName;}
-
-		string	directoryPath() {return mApplicationDirectory;}	/// Return the path of this application
-
+		
 		int	execute()
 		{
 			while (!mQuit)
@@ -131,11 +125,6 @@ version (linux)
 			return 0;
 		}
 
-		void	quit()
-		{
-			mQuit = true;
-		}
-
 		//==========================================================================
 		//==========================================================================
 
@@ -148,18 +137,12 @@ version (linux)
 		}*/
 
 		static GuiApplication		mInstance;
-		static bool					mQuit = false;
-
-		static string				mApplicationDisplayName = "DQuick - Application";
-		static string				mApplicationDirectory = ".";
-		static bool					mInitialized = false;
+		static Window[xcb_window_t]	mWindows;
 
 		static xcb_connection_t*	mConnection;
 		static Display*				mDisplay;
 		static int					mDefaultScreen;
 		static xcb_screen_t*		mScreen;
-
-		static Window[xcb_window_t]	mWindows;
 	}
 
 	//==========================================================================
@@ -290,6 +273,16 @@ version (linux)
 			return true;
 		}
 
+		bool	wasCreated() const
+		{
+			return (mWindow != 0);
+		}
+		
+		bool	isMainWindow() const
+		{
+			return (mWindowId == 0);
+		}
+		
 		void	show()
 		{
 		}
@@ -313,24 +306,13 @@ version (linux)
 		}
 		Vector2s32	position() {return mPosition;}
 
-		void	setSize(Vector2s32 newSize)
+		override void		setSize(Vector2s32 newSize)
 		{
+			super.setSize(newSize);
+			
 			mSize = newSize;
-
 			if (mRootItem)
 				mRootItem.setSize(Vector2f32(newSize));
-
-			// Resizing Window
-/*			RECT	rcClient, rcWindow;
-			POINT	ptDiff;
-
-			GetClientRect(mhWnd, &rcClient);
-			GetWindowRect(mhWnd, &rcWindow);
-			ptDiff.x = (rcWindow.right - rcWindow.left) - rcClient.right;
-			ptDiff.y = (rcWindow.bottom - rcWindow.top) - rcClient.bottom;
-			MoveWindow(mhWnd, rcWindow.left, rcWindow.top, mSize.x + ptDiff.x, mSize.y + ptDiff.y, true);*/
-			// --
-
 			if (mContext)
 				mContext.resize(mSize.x, mSize.y);
 		}

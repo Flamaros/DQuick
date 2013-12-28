@@ -21,6 +21,8 @@
         <Path>../src</Path>
         <Path>../src/dquick/etc/derelict/import</Path>
         <Path>../src/dquick/etc/gl3n</Path>
+        <Path>../src/dquick/etc/libX11</Path>
+        <Path>../src/dquick/etc/XCB</Path>
       </Includes>
     </Includes>
   </PropertyGroup>
