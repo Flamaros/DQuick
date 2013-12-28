@@ -81,11 +81,13 @@ static string	BASE_ITEM_BINDING()
 					return __itemBinding_env
 				end
 			)";
-			dmlEngine.load(lua, "");
+			dmlEngine.load(lua, "ItemBindingLuaEnv");
 
 			// Put component env
 			lua_rawgeti(dmlEngine.luaState, LUA_REGISTRYINDEX, dmlEngine.currentLuaEnv);
-			lua_setupvalue(dmlEngine.luaState, -2, 1);
+			const char*	envUpvalue = lua_setupvalue(dmlEngine.luaState, -2, 1);
+			if (envUpvalue == null) // No access to env, env table is still on the stack so we need to pop it
+				lua_pop(dmlEngine.luaState, 1);
 
 			dmlEngine.execute();
 
@@ -154,7 +156,7 @@ static string	BASE_ITEM_BINDING()
 		override void	valueFromLua(lua_State* L)
 		{
 			if (!lua_istable(L, -1))
-				throw new Exception("valueFromLua:: the lua value is not a table\n");
+				throw new Exception("the lua value is not a table\n");
 
 			mCreating = true;
 
@@ -185,15 +187,19 @@ static string	BASE_ITEM_BINDING()
 								if (lua_isfunction(L, -1))
 								{
 									// Set _ENV upvalue
-									lua_rawgeti(L, LUA_REGISTRYINDEX, itemBindingLuaEnvDummyClosureReference);
-									lua_upvaluejoin (L, -2, 1, -1, 1);
-									lua_pop(L, 1);
+									if (lua_getupvalue(L, -1, 1) != null)
+									{
+										lua_pop(L, 1);
+										lua_rawgeti(L, LUA_REGISTRYINDEX, itemBindingLuaEnvDummyClosureReference);
+										lua_upvaluejoin(L, -2, 1, -1, 1);
+										lua_pop(L, 1);
+									}
 
 									__traits(getMember, this, member).slotLuaReference = luaL_ref(L, LUA_REGISTRYINDEX);
 									lua_pushnil(L); // To compensate the value poped by luaL_ref
 								}
 								else
-									writefln("createLuaBind:: Attribute %s is not a function", key);
+									throw new Exception(format("attribute \"%s\" is a %s, a function was expected", key, getLuaTypeName(L, -1)));
 								break;
 							}
 						}
@@ -220,15 +226,19 @@ static string	BASE_ITEM_BINDING()
 									virtualProperty = *virtualPropertyPtr;
 								}
 								// Set _ENV upvalue
-								lua_rawgeti(L, LUA_REGISTRYINDEX, itemBindingLuaEnvDummyClosureReference);
-								lua_upvaluejoin (L, -2, 1, -1, 1);
-								lua_pop(L, 1);
+								if (lua_getupvalue(L, -1, 1) != null)
+								{
+									lua_pop(L, 1);
+									lua_rawgeti(L, LUA_REGISTRYINDEX, itemBindingLuaEnvDummyClosureReference);
+									lua_upvaluejoin(L, -2, 1, -1, 1);
+									lua_pop(L, 1);
+								}
 
 								virtualProperty.slotLuaReference = luaL_ref(L, LUA_REGISTRYINDEX);
 								lua_pushnil(L); // To compensate the value poped by luaL_ref
 							}
 							else
-								throw new Exception(format("createLuaBind:: Attribute %s is not a function", key));
+								throw new Exception(format("attribute \"%s\" is a %s, a function was expected", key, getLuaTypeName(L, -1)));
 						}
 						else
 						{
@@ -249,25 +259,32 @@ static string	BASE_ITEM_BINDING()
 				}
 				else if (lua_type(L, -2) == LUA_TNUMBER)
 				{
-					void*	itemBindingPtr = *(cast(void**)lua_touserdata(L, -1));
-					auto	child = cast(dquick.script.iItemBinding.IItemBinding)(itemBindingPtr);
+					if (lua_isuserdata(L, -1) == false)
+						throw new Exception(format("attribute \"%d\" is a %s, an item was expected", lua_tointeger(L, -2), getLuaTypeName(L, -1)));
+
+					dquick.script.iItemBinding.IItemBinding	child;
+					dquick.script.utils.valueFromLua!(dquick.script.iItemBinding.IItemBinding)(L, -1, child);
 					if (child is null)
-						throw new Exception(format("createLuaBind:: can't find item at key \"%d\"\n", lua_type(L, -2)));
+						throw new Exception(format("attribute \"%d\" is not an item", lua_tointeger(L, -2)));
 
-					static if (__traits(hasMember, this, "addChild") == false)
-						throw new Exception(format("createLuaBind:: can't add item at key \"%d\" as child without addChild method\n", lua_type(L, -2)));
-
-					foreach (overload; __traits(getOverloads, this, "addChild")) 
+					static if (__traits(hasMember, this, "addChild") == true)
 					{
-						alias ParameterTypeTuple!(overload) MyParameterTypeTuple;
-						static if (MyParameterTypeTuple.length == 1)
+						foreach (overload; __traits(getOverloads, this, "addChild")) 
 						{
-							DeclarativeItem	test = cast(DeclarativeItem)child;
-							MyParameterTypeTuple[0]	castedItemBinding = cast(MyParameterTypeTuple[0])(child);
-							if (castedItemBinding !is null)
-								__traits(getMember, this, "addChild")(castedItemBinding);
+							alias ParameterTypeTuple!(overload) MyParameterTypeTuple;
+							static if (MyParameterTypeTuple.length == 1)
+							{
+								MyParameterTypeTuple[0]	castedItemBinding = cast(MyParameterTypeTuple[0])(child);
+								if (castedItemBinding !is null)
+								{
+									__traits(getMember, this, "addChild")(castedItemBinding);
+									goto AfterError;
+								}
+							}
 						}
 					}
+					throw new Exception(format("can't add item at key \"%d\" as child without an appropriate addChild method", lua_tointeger(L, -2)));
+					AfterError: {}
 				}
 
 				/* removes 'value'; keeps 'key' for next iteration */
@@ -302,12 +319,10 @@ static string	genProperties(T)()
 			alias PropertyType!(T, member)	MyPropertyType;
 			static if (is(MyPropertyType == void) == false) // Property
 			{
-				static if (__traits(compiles, fullyQualifiedName2!(MyPropertyType))) // Hack because of a bug in fullyQualifiedName
+				static if (__traits(compiles, fullyQualifiedName2!(MyPropertyType)) && // Hack because of a bug in fullyQualifiedName
+						   member != "__ctor") 
 				{
-					static if (member == "__ctor")
-						continue;
-
-					static if (is(MyPropertyType : dquick.item.declarativeItem.DeclarativeItem))
+					static if (is(MyPropertyType : Object))
 					{
 										
 						result ~= format("	void															__%s(%s value) {
@@ -507,22 +522,7 @@ class ItemBinding(T) : ItemBindingBase!(T) // Proxy that auto bind T
 		this(item);
 	}
 
-	~this()
-	{
-		foreach (member; __traits(allMembers, typeof(this)))
-		{
-			static if (is(typeof(__traits(getMember, this, member)) : dquick.script.propertyBinding.PropertyBinding))
-			{
-				assert(__traits(getMember, this, member) !is null);
-				.destroy(__traits(getMember, this, member));
-			}
-		}
-
-		.destroy(item);
-	}
-
 	T	item;
-	DeclarativeItem	declarativeItem() {return item;}
 
 	dquick.script.dmlEngine.DMLEngine	dmlEngine2()
 	{

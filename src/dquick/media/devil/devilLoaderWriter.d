@@ -2,22 +2,12 @@ module dquick.media.devil.devilLoaderWriter;
 
 import dquick.media.imageData;
 import derelict.devil.il;
+
+import std.stdio;
 import std.string;
 
 class DevilLoaderWriter : ImageLoader, ImageWriter
 {	
-	static this()
-	{
-		DerelictIL.load();
-		ilInit();
-		ilEnable(IL_FILE_OVERWRITE);
-	}
-	
-	static ~this()
-	{
-		DerelictIL.unload();
-	}
-	
 	@property string name() const{ return "DevIL"; }
 
 	bool load(in string fileName, ref ImageData data) const
@@ -57,13 +47,10 @@ class DevilLoaderWriter : ImageLoader, ImageWriter
 		{
 			case ImageData.Format.Invalid:
 				throw new Exception("Image's format is invalid");
-				break;
 			case ImageData.Format.Gr:
 				throw new Exception("Image's format isn't supported for saving file.");
-				break;
 			case ImageData.Format.GrA:
 				throw new Exception("Image's format isn't supported for saving file.");
-				break;
 			case ImageData.Format.RGB:
 				ilTexImage(data.width, data.height, 1, data.nbBytesPerPixel(), IL_RGB, IL_UNSIGNED_BYTE, cast(void*)data.pixels.ptr);
 			   break;
@@ -104,4 +91,18 @@ private
 			return ImageData.Format.Invalid;
 		}
 	}
+}
+
+static this()
+{
+	writeln("dquick.media.devil.devilLoaderWriter : static this()");
+	DerelictIL.load();
+	ilInit();
+	ilEnable(IL_FILE_OVERWRITE);
+}
+
+static ~this()
+{
+	writeln("dquick.media.devil.devilLoaderWriter : static this()");
+	DerelictIL.unload();
 }

@@ -10,7 +10,6 @@ import derelict.lua.lua;
 
 import dquick.script.dmlEngine;
 import dquick.script.iItemBinding;
-import dquick.item.declarativeItem;
 
 class PropertyBinding
 {
@@ -70,7 +69,7 @@ class PropertyBinding
 		if (luaReference != -1)
 		{
 			// Binding overflow or property binding loop detection
-			if (itemBinding.dmlEngine.currentlyExecutedBindingStack.length >= 50)
+			if (itemBinding.dmlEngine.currentlyExecutedBindingStack.length >= itemBinding.dmlEngine.propertyBindingStackSize)
 			{
 				string	bindingLoopCallStack;
 				int	loopCount = 0;
@@ -88,10 +87,9 @@ class PropertyBinding
 					}
 				}
 				if (loopCount != 0)
-					throw new Exception(format("DMLEngine.IItemBinding.PropertyBinding.executeBinding: property binding loop detected, callstack:\n%s...", bindingLoopCallStack));
+					throw new Exception(format("property binding loop detected, callstack:\n%s...", bindingLoopCallStack));
 				else
-					throw new Exception(format("DMLEngine.IItemBinding.PropertyBinding.executeBinding: error, binding stack overflow (more than 50):\n%s...", bindingLoopCallStack));
-				return;
+					throw new Exception(format("binding stack overflow (more than 50):\n%s...", bindingLoopCallStack));
 			}
 
 			static if (dquick.script.dmlEngineCore.DMLEngineCore.showDebug)
@@ -110,44 +108,41 @@ class PropertyBinding
 
 			dependencies.clear();
 
-			itemBinding.dmlEngine.currentlyExecutedBindingStack ~= this;
-
-			//writefln("%sinitializationPhase = %d executeBinding %s", repeat("|\t", lvl), initializationPhase, item.id);
-			//writefln("top = %d", lua_gettop(luaState));
-
-			int	top = lua_gettop(itemBinding.dmlEngine.luaState);
-			lua_rawgeti(itemBinding.dmlEngine.luaState, LUA_REGISTRYINDEX, luaReference);
-			if (lua_pcall(itemBinding.dmlEngine.luaState, 0, LUA_MULTRET, 0) != LUA_OK)
 			{
-				version (release)
+				itemBinding.dmlEngine.currentlyExecutedBindingStack ~= this;
+				scope(exit) itemBinding.dmlEngine.currentlyExecutedBindingStack.length--;
+				scope(failure) dependencies.clear();
+
+				//writefln("%sinitializationPhase = %d executeBinding %s", repeat("|\t", lvl), initializationPhase, item.id);
+				//writefln("top = %d", lua_gettop(luaState));
+
+				int	top = lua_gettop(itemBinding.dmlEngine.luaState);
+				lua_rawgeti(itemBinding.dmlEngine.luaState, LUA_REGISTRYINDEX, luaReference);
+				if (lua_pcall(itemBinding.dmlEngine.luaState, 0, LUA_MULTRET, 0) != LUA_OK)
 				{
-					currentlyExecutedBindingStack.length--;
-					dependencies.clear();
-					return;
+					string error = to!(string)(lua_tostring(itemBinding.dmlEngine.luaState, -1));
+					lua_pop(itemBinding.dmlEngine.luaState, 1);
+					throw new Exception(error);
 				}
 
-				string error = to!(string)(lua_tostring(itemBinding.dmlEngine.luaState, -1));
-				lua_pop(itemBinding.dmlEngine.luaState, 1);
-				throw new Exception(format("lua_pcall error: %s", error));
-			}
-			scope(exit) lua_pop(itemBinding.dmlEngine.luaState, lua_gettop(itemBinding.dmlEngine.luaState) - top);
-
-			static if (dquick.script.dmlEngine.DMLEngine.showDebug)
-			{
+				static if (dquick.script.dmlEngine.DMLEngine.showDebug)
+				{
+					foreach (dependency; dependencies)
+					{
+						writefln("%sdepend on %s.%s", replicate("|\t", itemBinding.dmlEngine.lvl), dependency.itemBinding.id, dependency.propertyName);
+					}
+				}
 				foreach (dependency; dependencies)
-				{
-					writefln("%sdepend on %s.%s", replicate("|\t", itemBinding.dmlEngine.lvl), dependency.itemBinding.id, dependency.propertyName);
-				}
+					dependency.dependents[this] = this;
+
+				if (lua_gettop(itemBinding.dmlEngine.luaState) - top != 1)
+					throw new Exception(format("too few or too many return values on property binding %s.%s, got %d, expected 1", itemBinding.id, propertyName, lua_gettop(itemBinding.dmlEngine.luaState) - top));
 			}
-			foreach (dependency; dependencies)
-				dependency.dependents[this] = this;
 
-			if (lua_gettop(itemBinding.dmlEngine.luaState) - top != 1)
-				throw new Exception(format("executeBinding:: too few or too many return values on property binding %s.%s, got %d, expected 1\n", itemBinding.id, propertyName, lua_gettop(itemBinding.dmlEngine.luaState) - top));
+			// Put this so that onChanged can detect it's a value change from binding or from D
+			itemBinding.dmlEngine.propertyBindingBeeingSet = this;
 			valueFromLua(itemBinding.dmlEngine.luaState, -1, true);
-
-			// Pop from stack only after assignment so that onChanged can detect it's a value change from binding or from D
-			itemBinding.dmlEngine.currentlyExecutedBindingStack.length--;
+			itemBinding.dmlEngine.propertyBindingBeeingSet = null;
 		}
 	}
 
@@ -159,8 +154,7 @@ class PropertyBinding
 		if (itemBinding.creating == false)
 		{
 			// Detect assignment from D that compete with his binding
-			if ((itemBinding.dmlEngine.currentlyExecutedBindingStack.length == 0 || itemBinding.dmlEngine.currentlyExecutedBindingStack[itemBinding.dmlEngine.currentlyExecutedBindingStack.length - 1] !is this) &&
-				luaReference != -1)
+			if (itemBinding.dmlEngine.propertyBindingBeeingSet !is this && luaReference != -1)
 			{
 				dirty = true;
 				executeBinding();
@@ -168,18 +162,17 @@ class PropertyBinding
 			}
 
 			dirty = false;
+			static if (dquick.script.dmlEngine.DMLEngine.showDebug)
+				writefln("%s%s.%s.onChanged {", replicate("|\t", itemBinding.dmlEngine.lvl++), itemBinding.id, propertyName);
+
 			if (slotLuaReference != -1)
 				itemBinding.dmlEngine.execute(slotLuaReference);
 
 			static if (dquick.script.dmlEngine.DMLEngine.showDebug)
 			{
-				writefln("%s%s.%s.onChanged {", replicate("|\t", itemBinding.dmlEngine.lvl++), itemBinding.id, propertyName);
-				scope(exit)
-				{
-					assert(itemBinding.dmlEngine.lvl >= 1);
-					itemBinding.dmlEngine.lvl--;
-					writefln("%s}", replicate("|\t", itemBinding.dmlEngine.lvl));
-				}
+				assert(itemBinding.dmlEngine.lvl >= 1);
+				itemBinding.dmlEngine.lvl--;
+				writefln("%s}", replicate("|\t", itemBinding.dmlEngine.lvl));
 			}
 
 			auto dependentsCopy = dependents.dup;
@@ -203,11 +196,6 @@ class PropertyBinding
 	void	valueToLua(lua_State* L)
 	{
 		executeBinding();
-		//writefln("id = %s", declarativeItem.id);
-		// Register acces to value for property binding auto update
-		//if (currentlyExecutedBindingStack.length > 100)
-		//	writefln("currentlyExecutedBindingStack.length = %d", currentlyExecutedBindingStack.length);
-
 		if (itemBinding.dmlEngine.currentlyExecutedBindingStack.length > 0)
 		{
 			assert(itemBinding.dmlEngine.currentlyExecutedBindingStack[itemBinding.dmlEngine.currentlyExecutedBindingStack.length - 1] !is this);
@@ -219,13 +207,18 @@ class PropertyBinding
 	{
 		if (lua_isfunction(L, index)) // Binding is a lua function
 		{
+			lua_pushvalue(L, index);// To compensate the value poped by luaL_ref
+
 			// Set _ENV upvalue
-			lua_rawgeti(L, LUA_REGISTRYINDEX, itemBinding.itemBindingLuaEnvDummyClosureReference);
-			lua_upvaluejoin (L, -2, 1, -1, 1);
-			lua_pop(L, 1);
+			if (lua_getupvalue(L, -1, 1) != null)
+			{
+				lua_pop(L, 1);
+				lua_rawgeti(L, LUA_REGISTRYINDEX, itemBinding.itemBindingLuaEnvDummyClosureReference);
+				lua_upvaluejoin(L, -2, 1, -1, 1);
+				lua_pop(L, 1);
+			}
 
 			luaReference = luaL_ref(L, LUA_REGISTRYINDEX);
-			lua_pushnil(L); // To compensate the value poped by luaL_ref
 			dirty = true;
 			executeBinding();
 		}

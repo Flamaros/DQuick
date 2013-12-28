@@ -33,7 +33,7 @@ version (linux)
 	// TODO remove : normally in openglContextXXB.d
 	import derelict.opengl3.glx;
 
-	class GuiApplication : IGuiApplication
+	final class GuiApplication : GuiApplicationBase, IGuiApplication
 	{
 	public:
 		static this()
@@ -165,27 +165,26 @@ version (linux)
 	//==========================================================================
 	//==========================================================================
 
-	class Window : IWindow
+	final class Window : WindowBase, IWindow
 	{
 		this()
 		{
 			mWindowId = mWindowsCounter++;
-			mScriptContext = new DMLEngine;
-			mScriptContext.create();
-			mScriptContext.addItemType!(DeclarativeItem, "Item")();
-			mScriptContext.addItemType!(GraphicItem, "GraphicItem")();
-			mScriptContext.addItemType!(ImageItem, "Image")();
-			mScriptContext.addItemType!(TextItem, "Text")();
-			mScriptContext.addItemType!(BorderImageItem, "BorderImage")();
-			mScriptContext.addItemType!(MouseAreaItem, "MouseArea")();
-			mScriptContext.addItemType!(ScrollViewItem, "ScrollView")();
 		}
 
 		~this()
 		{
-			destroy();
+			mWindowsCounter--;
 		}
 
+		override
+		{
+			void		setMainItem(GraphicItem item) {super.setMainItem(item);}
+			void		setMainItem(string filePath) {super.setMainItem(filePath);}
+			GraphicItem	mainItem() {return super.mainItem();}
+			DMLEngine	dmlEngine() {return super.dmlEngine();}
+		}
+		
 		bool	create()
 		{
 			/* Initialize window and OpenGL context, run main loop and deinitialize */
@@ -295,41 +294,6 @@ version (linux)
 		{
 		}
 
-		void	destroy()
-		{
-			.destroy(mScriptContext);
-			.destroy(mContext);
-			mContext = null;
-
-			/* Cleanup */
-			glXDestroyWindow(GuiApplication.mDisplay, mGLXWindow);
-			xcb_destroy_window(GuiApplication.mConnection, mWindow);
-			glXDestroyContext(GuiApplication.mDisplay, context);
-
-/*			DestroyWindow(mhWnd);
-			if (mWindowId == 0)
-				GuiApplication.instance.quit();*/
-		}
-
-		/// Window will take size of this item
-		void	setMainItem(GraphicItem item)
-		{
-			mRootItem = item;
-		}
-
-		/// Window will take size of this item
-		void	setMainItem(string filePath)
-		{
-			mScriptContext.executeFile(filePath);
-
-			mRootItem = cast(GraphicItem)mScriptContext.rootItem();
-			assert(mRootItem);
-
-			mRootItem.setSize(Vector2f32(size()));
-		}
-
-		GraphicItem	mainItem() {return mRootItem;}
-
 		void		setPosition(Vector2s32 newPosition)
 		{
 			// TODO
@@ -386,28 +350,41 @@ version (linux)
 		//==========================================================================
 		//==========================================================================
 
-	private:
-		void	onPaint()
+	protected:
+		override
 		{
-			Renderer.startFrame();
-
-			if (mRootItem)
-				mRootItem.paint(false);
-
-			if (mContext)
-				mContext.swapBuffers();
-		}
-
-		void	onMouseEvent(MouseEvent mouseEvent)
-		{
-			if (mRootItem)
+			void	destroy()
 			{
-				mRootItem.mouseEvent(mouseEvent);
+				.destroy(mContext);
+				mContext = null;
+				
+				/* Cleanup */
+				glXDestroyWindow(GuiApplication.mDisplay, mGLXWindow);
+				xcb_destroy_window(GuiApplication.mConnection, mWindow);
+				glXDestroyContext(GuiApplication.mDisplay, context);
+			}
+			
+			void	onPaint()
+			{
+				Renderer.startFrame();
+
+				if (mRootItem)
+					mRootItem.paint(false);
+
+				if (mContext)
+					mContext.swapBuffers();
+			}
+
+			void	onMouseEvent(MouseEvent mouseEvent)
+			{
+				if (mRootItem)
+				{
+					mRootItem.mouseEvent(mouseEvent);
+				}
 			}
 		}
 
-		DMLEngine	mScriptContext;
-
+	private:
 		static int	mWindowsCounter = 0;
 		int			mWindowId;
 

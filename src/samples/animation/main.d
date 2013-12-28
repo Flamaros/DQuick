@@ -1,10 +1,19 @@
+module dquick.samples.animation.main;
+
 import dquick.system.guiApplication;
 import dquick.item.windowItem;
 import dquick.item.imageItem;
 import dquick.animation.animation;
-import core.time;
-import std.stdio;
+
+import std.file, std.stdio;
 import std.path;
+import core.time;
+
+version(Posix)
+{
+	// TODO remove that, it's normally linked with DQuick
+	pragma(lib, "dl");	// dl functions aren't linked by default with dmd
+}
 
 int main(string[] args)
 {
@@ -14,12 +23,15 @@ int main(string[] args)
 		GuiApplication.instance().setApplicationArguments(args);
 		GuiApplication.instance.setApplicationDisplayName("DQuick - Animation sample");
 		
+		writeln("Executable path: ", dirName(thisExePath()));
+		chdir(dirName(thisExePath()));
+
 		WindowItem wnd = new WindowItem();
 		wnd.width = 512;
 		wnd.height = 512;
 
 		ImageItem image = new ImageItem(wnd);
-		image.source = "../data/images/pngtest.png";
+		image.source = "images/pngtest.png";
 		image.width = 64;
 		image.height = 64;
 		
@@ -64,7 +76,7 @@ int main(string[] args)
 		
 		ImageItem btt = new ImageItem(wnd);
 		btt.y = 16;
-		btt.source = "../data/images/Qt/toolbutton.png";
+		btt.source = "images/Qt/toolbutton.png";
 			
 		ParallelAnimation bttSizeAnim = new ParallelAnimation();
 		bttSizeAnim.duration = dur!"msecs"(1500);

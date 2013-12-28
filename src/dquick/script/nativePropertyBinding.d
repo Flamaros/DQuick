@@ -35,13 +35,14 @@ class NativePropertyBinding(ValueType, ItemType, string PropertyName) : Property
 		static if (__traits(compiles, __traits(getMember, cast(ItemType)(item), PropertyName)(value)))
 			__traits(getMember, item, PropertyName)(value);
 		else
-			throw new Exception(format("Property \"%s\" is not writeable\n", PropertyName));			
+			throw new Exception(format("property \"%s\" is read only", PropertyName));			
 	}
 
 	override void	valueToLua(lua_State* L)
 	{
 		super.valueToLua(L);
-		ValueType	value = __traits(getMember, cast(ItemType)(item), PropertyName);
+		ValueType	value = void; // Assignation not on the same line due to a dmd compilation bug with multi dim static arrays
+		value = __traits(getMember, cast(ItemType)(item), PropertyName);
 		static if (is(ValueType : dquick.script.iItemBinding.IItemBinding))
 			itemBinding.dmlEngine.addObjectBinding(value);
 		dquick.script.utils.valueToLua!ValueType(L, value);

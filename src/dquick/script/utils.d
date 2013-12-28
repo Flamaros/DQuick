@@ -84,13 +84,38 @@ string	getLuaTypeName(lua_State* L, int index)
 		return "boolean";
 	else
 	{
-		throw new Exception(format("Lua value at index %d is an unknown type, a number, string or boolean was expected\n", index));
+		throw new Exception(format("Lua value at index %d is an unknown type, a number, string or boolean was expected", index));
 	}
+}
+
+enum LuaUserDataType : byte
+{
+	Item,
+	Method,
+	Array
+}
+
+struct LuaUserDataItem
+{
+	LuaUserDataType								type = LuaUserDataType.Item;
+	dquick.script.iItemBinding.IItemBinding		iItemBinding;
+}
+
+struct LuaUserDataMethod
+{
+	LuaUserDataType								type = LuaUserDataType.Method;
+	dquick.script.iItemBinding.IItemBinding		iItemBinding;
+}
+
+struct LuaUserDataArray(T)
+{
+	LuaUserDataType								type = LuaUserDataType.Array;
+	T											array;
 }
 
 void	valueFromLua(T)(lua_State* L, int index, ref T value)
 {
-	assert(isPointer!T == false);
+	static assert(isPointer!T == false);
 
 	static if (is(T == Variant))
 	{
@@ -100,31 +125,61 @@ void	valueFromLua(T)(lua_State* L, int index, ref T value)
 			value = lua_tonumber(L, index);
 		else if (lua_isstring(L, index))
 			value = to!(string)(lua_tostring(L, index));
+		else if (lua_istable(L, index))
+		{
+			assert(false, "Unfinished");
+			/+int	count = 0;
+			/* table is in the stack at index 't' */
+			lua_pushnil(L);  /* first key */
+			while (lua_next(L, -2) != 0) {
+				/* uses 'key' (at index -2) and 'value' (at index -1) */
+
+				if (count == 0) // First element set the type of the array
+				{
+					if (lua_isboolean(L, -1))
+						value = new bool[0];
+					else if (lua_isnumber(L, index))
+						value = new ReturnType!(lua_tonumber)[0];
+					else if (lua_isstring(L, index))
+						value = new string[0];
+					else
+						throw new Exception(format("Lua value at index %d is a %s that contains a %s, only numbers, booleans or strings was expected", index, getLuaTypeName(L, -3), getLuaTypeName(L, -1)));
+				}
+
+				value ~= 10;
+				//value.length++;
+				Variant	subValue;
+				valueFromLua!(typeof(value[value.length - 1]))(L, -1, subValue);
+
+				/* removes 'value'; keeps 'key' for next iteration */
+				lua_pop(L, 1);
+			}+/
+		}
 		else
-			throw new Exception(format("Lua value at index %d is a \"%s\", a number, boolean or string was expected\n", index, getLuaTypeName(L, index)));
+			throw new Exception(format("Lua value at index %d is a %s, a number, boolean or string was expected", index, getLuaTypeName(L, index)));
 	}
 	else static if (is(T == bool))
 	{
 		if (!lua_isboolean(L, index))
-			throw new Exception(format("Lua value at index %d is a \"%s\", a boolean was expected\n", index, getLuaTypeName(L, index)));
+			throw new Exception(format("Lua value at index %d is a %s, a boolean was expected", index, getLuaTypeName(L, index)));
 		value = cast(bool)lua_toboolean(L, index);
 	}
-	else static if (is(T == int) || is(T == uint) || is(T == enum))
+	else static if (is(T == int) || is(T == uint) || is(T == enum) || is(T == size_t))
 	{
 		if (!lua_isnumber(L, index))
-			throw new Exception(format("Lua value at index %d is a \"%s\", a number was expected\n", index, getLuaTypeName(L, index)));
+			throw new Exception(format("Lua value at index %d is a %s, a number was expected", index, getLuaTypeName(L, index)));
 		value = cast(typeof(value))lua_tointeger(L, index);
 	}
 	else static if (is(T == float))
 	{
 		if (!lua_isnumber(L, index))
-			throw new Exception(format("Lua value at index %d is a \"%s\", a number was expected\n", index, getLuaTypeName(L, index)));
+			throw new Exception(format("Lua value at index %d is a %s, a number was expected", index, getLuaTypeName(L, index)));
 		value = cast(float)lua_tonumber(L, index);
 	}
 	else static if (is(T == string))
 	{
 		if (!lua_isstring(L, index))
-			throw new Exception(format("Lua value at index %d is a \"%s\", a string was expected\n", index, getLuaTypeName(L, index)));
+			throw new Exception(format("Lua value at index %d is a %s, a string was expected", index, getLuaTypeName(L, index)));
 		value = to!(string)(lua_tostring(L, index));
 	}
 	else static if (is(T : dquick.script.iItemBinding.IItemBinding))
@@ -134,12 +189,94 @@ void	valueFromLua(T)(lua_State* L, int index, ref T value)
 		else
 		{
 			if (!lua_isuserdata(L, index))
-				throw new Exception(format("Lua value at index %d is a \"%s\", a userdata or nil was expected\n", index, getLuaTypeName(L, index)));
+				throw new Exception(format("Lua value at index %d is a %s, a userdata or nil was expected", index, getLuaTypeName(L, index)));
 
-			void*	itemBindingVoidPtr = *(cast(void**)lua_touserdata(L, index));
-			dquick.script.iItemBinding.IItemBinding	itemBindingPtr = cast(dquick.script.iItemBinding.IItemBinding)(itemBindingVoidPtr);
-			value = cast(T)(itemBindingPtr);
+			LuaUserDataItem*	luaUserData = cast(LuaUserDataItem*)lua_touserdata(L, index);
+
+			if (luaUserData.type != LuaUserDataType.Item)
+				throw new Exception(format("Lua value at index %d is not an item", index));
+
+			value = cast(T)(luaUserData.iItemBinding);
 		}
+	}
+	else static if (isDynamicArray!T || isStaticArray!T)
+	{
+		if (lua_istable(L, index))
+		{
+			static if (isDynamicArray!T)
+				value.clear();
+
+			int	count = 0;
+			/* table is in the stack at index 't' */
+			lua_pushnil(L);  /* first key */
+			while (lua_next(L, -2) != 0) {
+				/* uses 'key' (at index -2) and 'value' (at index -1) */
+
+				static if (isDynamicArray!T)
+					value.length++;
+				else if (isStaticArray!T)
+				{
+					if (count >= value.length)
+						throw new Exception(format("Lua value at index %d is a %s that overflows", index, getLuaTypeName(L, -3)));
+				}
+				valueFromLua!(typeof(value[count]))(L, -1, value[count]);
+
+				/* removes 'value'; keeps 'key' for next iteration */
+				lua_pop(L, 1);
+
+				count++;
+			}
+			static if (isStaticArray!T)
+			{
+				if (count != value.length)
+					throw new Exception(format("Lua value at index %d is a %s that underflows", index, getLuaTypeName(L, -3)));
+			}
+		}
+		else if (lua_isuserdata(L, index))
+		{
+			LuaUserDataArray!T*	luaUserData = cast(LuaUserDataArray!T*)lua_touserdata(L, index);
+
+			if (luaUserData.type != LuaUserDataType.Array)
+				throw new Exception(format("Lua value at index %d is not an array", index));
+
+			value = cast(T)(luaUserData.array);
+		}
+		else
+			throw new Exception(format("Lua value at index %d is a %s, a table or a userdata was expected", index, getLuaTypeName(L, index)));
+	}
+	else static if (isAssociativeArray!T)
+	{
+		if (lua_istable(L, index))
+		{
+			value.clear();
+
+			KeyType!T	key;
+			typeof(value[key])	elemValue;
+
+			/* table is in the stack at index 't' */
+			lua_pushnil(L);  /* first key */
+			while (lua_next(L, -2) != 0) {
+				/* uses 'key' (at index -2) and 'value' (at index -1) */
+
+				valueFromLua!(typeof(key))(L, -2, key);
+				valueFromLua!(typeof(elemValue))(L, -1, elemValue);
+				value[key] = elemValue;
+
+				/* removes 'value'; keeps 'key' for next iteration */
+				lua_pop(L, 1);
+			}
+		}
+		else if (lua_isuserdata(L, index))
+		{
+			LuaUserDataArray!T*	luaUserData = cast(LuaUserDataArray!T*)lua_touserdata(L, index);
+
+			if (luaUserData.type != LuaUserDataType.Array)
+				throw new Exception(format("Lua value at index %d is not an array", index));
+
+			value = cast(T)(luaUserData.array);
+		}
+		else
+			throw new Exception(format("Lua value at index %d is a %s, a table or a userdata was expected", index, getLuaTypeName(L, index)));
 	}
 	else
 	{
@@ -149,7 +286,7 @@ void	valueFromLua(T)(lua_State* L, int index, ref T value)
 
 void	valueToLua(T)(lua_State* L, T value)
 {
-	assert(isPointer!T == false);
+	static assert(isPointer!T == false);
 
 	static if (is(T == Variant))
 	{
@@ -162,9 +299,9 @@ void	valueToLua(T)(lua_State* L, T value)
 		else if (value.type == typeid(bool))
 			lua_pushboolean(L, value.get!bool);
 		else
-			throw new Exception(format("Variant has type \"%s\", an int, double, bool or string was expected\n", value.type));
+			throw new Exception(format("Variant has type %s, an int, double, bool or string was expected", value.type));
 	}
-	else static if (is(T == int) || is(T == uint) || is(T == enum))
+	else static if (is(T == int) || is(T == uint) || is(T == enum) || is(T == size_t))
 		lua_pushinteger(L, value);
 	else static if (is(T == float))
 		lua_pushnumber(L, value);
@@ -178,14 +315,11 @@ void	valueToLua(T)(lua_State* L, T value)
 			lua_pushnil(L);
 		else
 		{
-			DeclarativeItem	ditem = cast(DeclarativeItem)value;
-
 			// Create a userdata that contains instance ptr and make it a global for user access
 			// It also contains a metatable for the member read and write acces
-			dquick.script.iItemBinding.IItemBinding	iItemBinding = cast(dquick.script.iItemBinding.IItemBinding)value;
-			void*	iItemBindingVoidPtr = cast(void*)(iItemBinding);
-			void*	userData = lua_newuserdata(L, iItemBindingVoidPtr.sizeof);
-			memcpy(userData, &iItemBindingVoidPtr, iItemBindingVoidPtr.sizeof);
+			void*	userData = lua_newuserdata(L, LuaUserDataItem.sizeof);
+			(cast(LuaUserDataItem*)userData).type = LuaUserDataType.Item;
+			(cast(LuaUserDataItem*)userData).iItemBinding = value;
 
 			lua_newtable(L);
 
@@ -199,13 +333,128 @@ void	valueToLua(T)(lua_State* L, T value)
 			lua_setmetatable(L, -2);
 		}
 	}
+	else static if (isDynamicArray!T || isStaticArray!T)
+	{
+		// Pass array by value, unoptimized
+		/+lua_newtable(L);
+		for (int index = 0; index < value.length; index++)
+		{
+			lua_pushnumber(L, index + 1);
+			valueToLua!(typeof(value[index]))(L, value[index]);
+			lua_settable(L, -3);
+		}+/
+
+		void*	userData = lua_newuserdata(L, (LuaUserDataArray!T).sizeof);
+		(cast(LuaUserDataArray!T*)userData).type = LuaUserDataType.Array;
+		(cast(LuaUserDataArray!T*)userData).array = value;
+
+		lua_newtable(L);
+
+		lua_pushstring(L, "__index");
+		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.arrayIndexLuaBind!T);
+		lua_settable(L, -3);
+		lua_pushstring(L, "__newindex");
+		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.arrayNewindexLuaBind!T);
+		lua_settable(L, -3);
+
+		lua_setmetatable(L, -2);
+	}
+	else static if (isAssociativeArray!T)
+	{
+		// Pass array by value, unoptimized
+		/+lua_newtable(L);
+		foreach (key, elemValue; value)
+		{
+			valueToLua!(typeof(key))(L, key);
+			valueToLua!(typeof(elemValue))(L, elemValue);
+			lua_settable(L, -3);
+		}+/
+
+		void*	userData = lua_newuserdata(L, (LuaUserDataArray!T).sizeof);
+		(cast(LuaUserDataArray!T*)userData).type = LuaUserDataType.Array;
+		(cast(LuaUserDataArray!T*)userData).array = value;
+
+		lua_newtable(L);
+
+		lua_pushstring(L, "__index");
+		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.arrayIndexLuaBind!T);
+		lua_settable(L, -3);
+		lua_pushstring(L, "__newindex");
+		lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.arrayNewindexLuaBind!T);
+		lua_settable(L, -3);
+
+		lua_setmetatable(L, -2);
+	}
 	else
 	{
 		static assert(false);
 	}
 }
 
-void	luaCallD(alias func)(lua_State* L, int firstParamIndex)
+void	methodFromLua(T)(lua_State* L, int index, ref T object)
+{
+	assert(isPointer!T == false);
+
+	static if (is(T : dquick.script.iItemBinding.IItemBinding))
+	{
+		if (lua_isnil(L, index))
+			object = null;
+		else
+		{
+			if (!lua_isuserdata(L, index))
+				throw new Exception(format("Lua value at index %d is a %s, a userdata or nil was expected", index, getLuaTypeName(L, index)));
+
+			LuaUserDataMethod*	luaUserData = cast(LuaUserDataMethod*)lua_touserdata(L, index);
+
+			if (luaUserData.type != LuaUserDataType.Method)
+				throw new Exception(format("Lua value at index %d is not a method", index));
+
+			object = cast(T)(luaUserData.iItemBinding);
+		}
+	}
+	else
+	{
+		static assert(false, fullyQualifiedName2!(T));
+	}
+}
+
+void	methodToLua(T, string methodName)(lua_State* L, T object)
+{
+	assert(isPointer!T == false);
+
+	static if (is(T : dquick.script.iItemBinding.IItemBinding))
+	{
+		// Create a userdata that contains instance ptr and return it to emulate a method
+		// It also contains a metatable for calling
+		void*	userData = lua_newuserdata(L, LuaUserDataMethod.sizeof);
+		(cast(LuaUserDataMethod*)userData).type = LuaUserDataType.Method;
+		(cast(LuaUserDataMethod*)userData).iItemBinding = object;
+
+		// Create metatable
+		lua_newtable(L);
+		{
+			// Call metamethod to instanciate type
+			lua_pushstring(L, "__call");
+			lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.methodCallLuaBind!(methodName, typeof(object)));
+			lua_settable(L, -3);
+			// Index metamethod to warn user that it's a method
+			lua_pushstring(L, "__index");
+			lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.methodIndexLuaBind!(methodName, typeof(object)));
+			lua_settable(L, -3);
+			// newIndex metamethod to warn user that it's a method
+			lua_pushstring(L, "__newindex");
+			lua_pushcfunction(L, cast(lua_CFunction)&dquick.script.dmlEngineCore.methodNewIndexLuaBind!(methodName, typeof(object)));
+			lua_settable(L, -3);
+		}
+		lua_setmetatable(L, -2);
+	}
+	else
+	{
+		static assert(false);
+	}
+}
+
+int	luaCallD(alias func)(lua_State* L, int firstParamIndex)
 {			
 	//static assert(isSomeFunction!func, "func must be a function or a method");
 	static assert(__traits(isStaticFunction, func), "func must be a static function");
@@ -213,6 +462,10 @@ void	luaCallD(alias func)(lua_State* L, int firstParamIndex)
 	// Collect all argument in a tuple
 	alias ParameterTypeTuple!func MyParameterTypeTuple;
 	MyParameterTypeTuple	parameterTuple;
+
+	if (lua_gettop(L) + 1 - firstParamIndex > parameterTuple.length)
+		throw new Exception(format("too many arguments, expected %d", parameterTuple.length));
+
 	foreach (index, paramType; MyParameterTypeTuple)
 		dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index, parameterTuple[index]);
 	lua_pop(L, parameterTuple.length);
@@ -220,17 +473,21 @@ void	luaCallD(alias func)(lua_State* L, int firstParamIndex)
 	// Call D function
 	alias ReturnType!func	returnType;
 	static if (is(returnType == void))
+	{
 		func(parameterTuple);
+		return 0;
+	}
 	else
 	{
 		returnType returnVal = func(parameterTuple);
 
 		// Write return value into lua stack
 		valueToLua(L, returnVal);
+		return 1;
 	}
 }
 
-void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamIndex)
+int	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamIndex)
 {
 	static assert(isSomeFunction!(__traits(getMember, T, funcName)) &&
 				  !__traits(isStaticFunction, __traits(getMember, T, funcName)) &&
@@ -240,6 +497,10 @@ void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamInd
 	// Collect all argument in a tuple
 	alias ParameterTypeTuple!(__traits(getMember, T, funcName)) MyParameterTypeTuple;
 	MyParameterTypeTuple	parameterTuple;
+
+	if (lua_gettop(L) + 1 - firstParamIndex > parameterTuple.length)
+		throw new Exception(format("too many arguments, expected %d", parameterTuple.length));
+
 	foreach (index, paramType; MyParameterTypeTuple)
 		dquick.script.utils.valueFromLua!paramType(L, firstParamIndex + index, parameterTuple[index]);
 	lua_pop(L, parameterTuple.length);
@@ -249,6 +510,7 @@ void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamInd
 	static if (is(returnType == void))
 	{
 		__traits(getMember, thisRef, funcName)(parameterTuple);
+		return 0;
 	}
 	else
 	{
@@ -256,6 +518,7 @@ void	luaCallThisD(string funcName, T)(T thisRef, lua_State* L, int firstParamInd
 
 		// Write return value into lua stack
 		valueToLua(L, returnVal);
+		return 1;
 	}
 }
 
@@ -302,6 +565,114 @@ unittest
 	}
 
 	static assert(is(PropertyType!(Test, "prop") == short));
+}
+
+/*
+** search for 'objidx' in table at index -1.
+** return 1 + string at top if find a good name.
+*/
+private static int findfield (lua_State *L, int objidx, int level) {
+	if (level == 0 || !lua_istable(L, -1))
+		return 0;  /* not found */
+	lua_pushnil(L);  /* start 'next' loop */
+	while (lua_next(L, -2)) {  /* for each pair in table */
+		if (lua_type(L, -2) == LUA_TSTRING) {  /* ignore non-string keys */
+			if (lua_rawequal(L, objidx, -1)) {  /* found object? */
+				lua_pop(L, 1);  /* remove value (but keep name) */
+				return 1;
+			}
+			else if (findfield(L, objidx, level - 1)) {  /* try recursively */
+				lua_remove(L, -2);  /* remove table (but keep name) */
+				lua_pushliteral(L, ".");
+				lua_insert(L, -2);  /* place '.' between the two names */
+				lua_concat(L, 3);
+				return 1;
+			}
+		}
+		lua_pop(L, 1);  /* remove value */
+	}
+	return 0;  /* not found */
+}
+
+
+private static int pushglobalfuncname(lua_State* L, lua_Debug* ar)
+{
+	int top = lua_gettop(L);
+	lua_getinfo(L, "f", ar);  /* push function */
+	lua_pushglobaltable(L);
+	if (findfield(L, top + 1, 2))
+	{
+		lua_copy(L, -1, top + 1);  /* move name to proper place */
+		lua_pop(L, 2);  /* remove pushed values */
+		return 1;
+	}
+	else
+	{
+		lua_settop(L, top);  /* remove function and global table */
+		return 0;
+	}
+}
+
+private static void pushfuncname(lua_State* L, lua_Debug* ar)
+{
+	if (ar.namewhat != null)  /* is there a name? */
+	{
+		lua_pushstring(L, "function ");
+		lua_pushstring(L, ar.name);
+	}
+	else if (ar.what[0] == 'm')  /* main? */
+		lua_pushstring(L, "main chunk");
+	else if (ar.what[0] == 'C')
+	{
+		if (pushglobalfuncname(L, ar))
+		{
+			lua_pushstring(L, "function ");
+			lua_pushstring(L, lua_tostring(L, -1));
+			lua_remove(L, -2);  /* remove name */
+		}
+		else
+			lua_pushliteral(L, "?");
+	}
+	else
+	{
+		lua_pushstring(L, "function <");
+		lua_pushstring(L, to!(string)(ar.short_src).toStringz);
+		lua_pushstring(L, ":");
+		lua_pushstring(L, to!(string)(ar.currentline).toStringz);
+		lua_pushstring(L, ">");
+	}
+}
+
+void	luaError(lua_State* L, string msg)
+{
+	int top = lua_gettop(L);
+	lua_pushstring(L, msg.toStringz());
+	lua_Debug ar;
+	for (int level = 0; lua_getstack(L, level, &ar); level++)
+	{
+		lua_getinfo(L, "Sln", &ar);  /* get info about it */
+		if (to!(string)(ar.source) != "ItemBindingLuaEnv" &&
+			to!(string)(ar.source) != "ComponentEnvChaining") /* is there info? */
+		{ 
+			lua_pushstring(L, "\n\t");
+			if (ar.short_src[0] == '[' && ar.short_src[1] == 'C' && ar.short_src[2] == ']')
+				lua_pushstring(L, "[D]");
+			else
+				lua_pushstring(L, to!(string)(ar.short_src).toStringz);
+			if (ar.currentline > 0)
+			{
+				lua_pushstring(L, ":");
+				lua_pushstring(L, to!(string)(ar.currentline).toStringz);
+			}
+			if (to!(string)(ar.name) != "")
+			{
+				lua_pushstring(L, " in ");
+				pushfuncname(L, &ar);
+			}
+			lua_concat(L, lua_gettop(L) - top);
+		}
+	}
+	lua_error(L);
 }
 
 
