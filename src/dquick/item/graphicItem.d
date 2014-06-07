@@ -153,7 +153,9 @@ public:
 	void	release()
 	{
 		mDebugMesh.destruct();
+		mDebugMesh = null;
 		mDebugImplicitMesh.destruct();
+		mDebugImplicitMesh = null;
 		super.release();
 	}
 
@@ -260,7 +262,7 @@ protected:
 	{
 		void	createDebugMeshes()	// Safe to call it if mesh is already created
 		{
-			if (mDebugMesh.indexes)
+			if (mDebugMesh)
 				return;
 
 			Variant[] options;
@@ -270,6 +272,7 @@ protected:
 			mDebugShaderProgram = cast(ShaderProgram)mDebugShader.getProgram();
 
 			// Size
+			mDebugMesh = new Mesh;
 			mDebugMesh.construct();
 			mDebugMesh.setShader(mDebugShader);
 			mDebugMesh.setShaderProgram(mDebugShaderProgram);
@@ -279,6 +282,7 @@ protected:
 			mDebugMesh.geometry.setArray(debugMeshGeometryArray(), VBOMode.Dynamic);
 
 			// ImplicitSize
+			mDebugImplicitMesh = new Mesh;
 			mDebugImplicitMesh.construct();
 			mDebugImplicitMesh.setShader(mDebugShader);
 			mDebugImplicitMesh.setShaderProgram(mDebugShaderProgram);
